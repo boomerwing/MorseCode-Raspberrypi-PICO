@@ -11,6 +11,8 @@ This repo contains my base project for [FreeRTOS](https://freertos.org/) on the 
 
 |___/App-Shuffle            // Source code for App-Keyer
 
+|___/App-TxtCtl             // Source code for App-TxtCtl
+
 |___/Common                 // Source code common to applications
 |
 |___CMakeLists.txt          // Top-level project CMake config file
@@ -47,9 +49,17 @@ This C app is a Morse Code CW Keyer used by Radio Amateurs to automatically tran
 
 This C app is a programming exercise to create a shuffle function. It can be set to shuffle any length character string (as shown it shuffles a complete Alphabet). It is controlled by two switches which are debounced in separate RTOS tasks. The output is displayed in the Minicom terminal App which is controlled by VT100 codes. The display shows how to use the switches to command the function.
 
+### App Three: App-TxtCtl
+
+This C app is a programming exercise to create a Control function responding to text input from a PS2 Keyboard. An RTOS task reads the Keyboard with the RP2040 pio function in Common/PS2.c It commands LEDs in a seven segment display to blink.
+
 ### Common: Seven_seg.c
 
 This code configures the Seven Segment LED module and displays the number (HEX or Decimal) sent to it.  My LED Module has two dots.  If your module has no dots or just one, you can use separate LEDs.
+
+### Common: ps2.c
+This code initializes, then manages the PS2 Keyboard input, decoding the keyboard scan codes and providing an ASCII character output.  This code can be called by an RTOS task.
+
 
 
 ## Credits
