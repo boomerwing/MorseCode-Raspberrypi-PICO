@@ -10,10 +10,18 @@ set(APP_1_VERSION_NUMBER "1.0.0")
 set(APP_2_NAME "SHUFFLE_DEMO")
 set(APP_2_VERSION_NUMBER "1.0.0")
 
+set(APP_3_NAME "SWI2C_DEMO")
+set(APP_3_VERSION_NUMBER "1.0.0")
+
+set(APP_4_NAME "TXTCTL_DEMO")
+set(APP_4_VERSION_NUMBER "1.0.0")
+
 
 # Specify the app(s) source code
 set(APP_1_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-Keyer")
 set(APP_2_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-Shuffle")
+set(APP_3_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-SWi2c")
+set(APP_4_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-TxtCtl")
 
 # FROM 1.3.0 -- Move common source code to a separate directory
 set(COMMON_CODE_DIRECTORY "${CMAKE_SOURCE_DIR}/Common")
@@ -66,3 +74,5 @@ target_include_directories(FreeRTOS PUBLIC
 # Include the apps' source code
 add_subdirectory(${APP_1_SRC_DIRECTORY})
 add_subdirectory(${APP_2_SRC_DIRECTORY})
+add_subdirectory(${APP_3_SRC_DIRECTORY})
+add_subdirectory(${APP_4_SRC_DIRECTORY})
