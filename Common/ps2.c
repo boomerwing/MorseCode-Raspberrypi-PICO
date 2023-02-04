@@ -1,3 +1,7 @@
+/* PS2 Keyboard read with RP2040 pio function
+*  Based on [PS2Keyboard](https://github.com/PaulStoffregen/PS2Keyboard)
+*/
+
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
 #include "hardware/gpio.h"
