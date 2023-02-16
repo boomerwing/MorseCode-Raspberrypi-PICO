@@ -1,0 +1,5 @@
+.program ps2kbd
+    wait 0 pin 1        ; Wait negative clock edge 
+    in pins, 1          ; Sample data
+    wait 1 pin 1        ; Wait for positive edge
+ 
