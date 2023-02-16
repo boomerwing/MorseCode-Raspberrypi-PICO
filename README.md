@@ -6,7 +6,8 @@ This repo contains my base project for [FreeRTOS](https://freertos.org/) on the 
 
 ```
 /FreeRTOS-PICO
-|
+|___/App-CWKeyer            // Source code for App-CWKeyer
+
 |___/App-Keyer              // Source code for App-Keyer
 
 |___/App-Shuffle            // Source code for App-Keyer
@@ -51,7 +52,11 @@ This C app is a programming exercise to create a shuffle function. It can be set
 
 ### App Three: App-TxtCtl
 
-This C app is a programming exercise to create a Control function responding to text input from a PS2 Keyboard. An RTOS task reads the Keyboard with the RP2040 pio function in Common/PS2.c It commands LEDs in a seven segment display to blink.
+This FreeRTOS C app is a programming exercise to create a Control function responding to text input from a PS2 Keyboard. An RTOS task reads the Keyboard with the RP2040 pio function in Common/PS2.c It commands LEDs in a seven segment display to blink.
+
+### App Four: App-CWKeyer
+
+This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows three switches to select up to eight messages. A Seven Segment LED module shows the message number and two LED dots blink in response to the morse code being sent. This version of App-Keyer adds PS2 Keyboard input of a Message String in phrase No. 7. Enter the string while strings 0-6 are being output. The PS2 Keyboard is being managed by a PIO input.
 
 ### Common: Seven_seg.c
 
