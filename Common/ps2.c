@@ -199,8 +199,9 @@ char get_iso8859_code(void)
 static uint8_t kbd_getc(void) {
     // pull a scan code from the PIO SM fifo
     while (pio_sm_is_rx_fifo_empty(KBD_PIO, kbd_sm))
-        tight_loop_contents();
-        
+        // tight_loop_contents();
+        vTaskDelay(ms_delay50);
+
     // strip the start, parity, and stop bits
     return KBD_PIO->rxf[kbd_sm] >> 22;
 }
