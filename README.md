@@ -32,7 +32,7 @@ To use the code in this repo, your system must be set up for RP2040 C/C++ develo
 ## Usage
 
 1. Clone the repo: `git clone https://github.com/smittytone/RP2040-FreeRTOS`.
-1. Enter the repo: `cd RP2040-FreeRTOS`.
+1. Enter the repo: `cd FreeRTOS-PICO`.
 1. Install the submodules: `git submodule update --init --recursive`.
 1. Optionally, edit `CMakeLists.txt` and `/<Application>/CMakeLists.txt` to rename the project.
 1. Optionally, manually configure the build process: `cmake -S . -B build/`.
@@ -71,6 +71,8 @@ This code configures the Seven Segment LED module and displays the number (HEX o
 ### Common: ps2.c
 This code initializes, then manages the PS2 Keyboard input, decoding the keyboard scan codes and providing an ASCII character output.  This code can be called by an RTOS task.
 
+### Common: pcf8575.c
+This code initializes, then manages the pcf8575 port extender, driving the seven segment LED and providing input ports.
 
 
 ## Credits
