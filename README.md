@@ -6,13 +6,15 @@ This repo contains my base project for [FreeRTOS](https://freertos.org/) on the 
 
 ```
 /FreeRTOS-PICO
-|___/App-CWTeach            // Source code for App-CWKeyer
-
 |___/App-CWKeyer            // Source code for App-CWKeyer
+
+|___/App-CWTeach            // Source code for App-CWKeyer
 
 |___/App-Keyer              // Source code for App-Keyer
 
 |___/App-Shuffle            // Source code for App-Keyer
+
+|___/App-SW-i2c             // Source code for App-SW-i2c
 
 |___/App-TxtCtl             // Source code for App-TxtCtl
 
