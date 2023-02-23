@@ -6,6 +6,8 @@ This repo contains my base project for [FreeRTOS](https://freertos.org/) on the 
 
 ```
 /FreeRTOS-PICO
+|___/App-CWTeach            // Source code for App-CWKeyer
+
 |___/App-CWKeyer            // Source code for App-CWKeyer
 
 |___/App-Keyer              // Source code for App-Keyer
@@ -40,7 +42,7 @@ To use the code in this repo, your system must be set up for RP2040 C/C++ develo
 
 ## The Apps
 
-This repo includes a number of deployable apps. The project builds them all, sequentially. Exclude apps from the build process by commenting out their `add_subdirectory()` lines in the top-level `CMakeLists.txt`.
+This repo includes a number of deployable apps.
 
 ### App One: App-Keyer
 
@@ -56,7 +58,11 @@ This FreeRTOS C app is a programming exercise to create a Control function respo
 
 ### App Four: App-CWKeyer
 
-This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows three switches to select up to eight messages. A Seven Segment LED module shows the message number and two LED dots blink in response to the morse code being sent. This version of App-Keyer adds PS2 Keyboard input of a Message String in phrase No. 7. Enter the string while strings 0-6 are being output. The PS2 Keyboard is being managed by a PIO input.
+This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows three switches to select up to eight messages. A Seven Segment LED module shows the message number. An LED blinks in response to the morse code being sent. This version of App-Keyer adds PS2 Keyboard input of a Message String in phrase No. 7. Enter the string while strings 0-6 are being output. The PS2 Keyboard is being managed by a PIO input.
+
+### App Five: App-CWTeach
+
+This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows three switches to select up to eight messages. A Seven Segment LED module shows the message number. An LED blinks in response to the morse code being sent. This version of App-Keyer adds a Message String random generated alphabet in phrase No. 7 (The eighth phrase). The first random string is initialized with two presses of the switch on Port 4 of the PIO expander used. Press the switch again to change the random string. Select the next random string while strings 0-6 are being output. The PS2 Keyboard is not implemented for this app.
 
 ### Common: Seven_seg.c
 
