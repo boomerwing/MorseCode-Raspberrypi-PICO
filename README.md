@@ -29,14 +29,14 @@ This repo contains my base project for [FreeRTOS](https://freertos.org/) on the 
 
 ## Prerequisites
 
-To use the code in this repo, your system must be set up for RP2040 C/C++ development. See [this blog post of "smittytone"](https://blog.smittytone.net/2021/02/02/program-raspberry-pi-pico-c-mac/) for setup details.
+To use the code in this repo, your system must be set up for RP2040 C/C++ and FreeRTOS development. See [this blog post of "smittytone"](https://blog.smittytone.net/2021/02/02/program-raspberry-pi-pico-c-mac/) for setup details.
 
 ## Usage
 
 1. Clone the repo: `git clone https://github.com/smittytone/RP2040-FreeRTOS`.
 1. Enter the repo: `cd FreeRTOS-PICO`.
 1. Install the submodules: `git submodule update --init --recursive`.
-1. Optionally, edit `CMakeLists.txt` and `/<Application>/CMakeLists.txt` to rename the project.
+1. Edit `CMakeLists.txt` and `/<Application>/CMakeLists.txt` to rename the project.
 1. Optionally, manually configure the build process: `cmake -S . -B build/`.
 1. Optionally, manually build the app: `cmake --build build`.
 1. Connect your device so it’s ready for file transfer.
