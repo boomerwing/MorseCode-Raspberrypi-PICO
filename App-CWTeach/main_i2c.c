@@ -23,8 +23,8 @@
 #define DOT_PERIOD 75
 #define SENTENCE 1
 #define I2C_ADDR 0x20
-#define DECKSIZE 26
-#define SPTOOSIZE 36
+#define DECKSIZE 36
+#define SPTOOSIZE 45
 
 /* 
  * GLOBALS
@@ -83,9 +83,6 @@ volatile QueueHandle_t xQphrase5 = NULL;
             } 
         }
          if (sw_state == 1) {
-//                printf("\x1B[%i;%iH",6,0);
-//                printf("\x1B[K");  //  clear to end of Line Right
-//                printf("  ** Set Switch1 UP ** "); 
             while (sw_state == 1){
                 vTaskDelay(ms_delay50);  // Break for other tasks
                 j += (rand() % 137 * rand() % 79);
@@ -96,11 +93,7 @@ volatile QueueHandle_t xQphrase5 = NULL;
                 }
             } 
         }
-//            printf("\x1B[%i;%iH",6,0);  // place curser
-//            printf("\x1B[K");  //  clear to end of Line Right
-//            printf("  *** Set Switch1 Down then Up ***");
-//            printf("\x1B[%i;%ir",10,20);  // set top and bottom lines of window
-       while (sw_state == 1){
+        while (sw_state == 1){
             vTaskDelay(ms_delay50);  // Break for other tasks
             j += (rand() % 137 * rand() % 79);
             uxMessagesWaiting = uxQueueMessagesWaiting(xQsw1);
@@ -133,14 +126,19 @@ volatile QueueHandle_t xQphrase5 = NULL;
                                  
     // initialize orig deck with Capital Alphabetic Characters
     for (i = 0; i < DECKSIZE; i++) {
+        if(i < 26){  // add characters of the alphabet
         deck1[i] = i + 65; 
         }
-        deck1[deck_size] = '\0';  //  add end to the unshuffled deck string
+        else{  // add numbers
+            deck1[i] = i + 22;
+            }
+        }
+        deck1[deck_size+1] = '\0';  //  add end to the unshuffled deck string
 
     for (i = 0; i < DECKSIZE; i++) {  // initialize final deck with '*' string
         deck2[i] = '*';
         }
-        deck2[DECKSIZE]  = '\0';  //  add end to the shuffled deck string
+        deck2[DECKSIZE+1]  = '\0';  //  add end to the shuffled deck string
 
 // Beginning of each Shuffle
     while (true) {
@@ -185,13 +183,16 @@ volatile QueueHandle_t xQphrase5 = NULL;
 
             vTaskDelay(ms_delay10);  // Break for other tasks
             }  // end of while(deck_size > 0)
-      // setup for next shuffle 
+      // setup for next shuffle  
         for (i = 0; i < DECKSIZE; i++) {
             deck1[i] = deck2[i];
             deck2[i] = '*';  
             }
-            
-        // purge sptoo deck with '\0"
+
+    // Now make a string of deck1 with spaces after every six letters
+    // to send to string 7 of CW task
+    
+        // purge sptoo deck with '\0'
         for (i = 0; i < SPTOOSIZE; i++) {
             sptoo[i] = '\0'; 
             }
@@ -199,10 +200,11 @@ volatile QueueHandle_t xQphrase5 = NULL;
         j = 0; 
         i = 0;   
         for(i=0;i<DECKSIZE;i++,j++){
-            if(i == 0) sptoo[j] = deck1[i];
-
+            if(i == 0){
+                sptoo[j] = deck1[i];
+            }
             else if((i%6) == 0){
-                sptoo[j++] = 0x20;  // every 6 letters, add a space to output
+                sptoo[j++] = 0x20;  // after every 6 letters, add a space to output
                 sptoo[j] = deck1[i];
             }
             else {
@@ -308,7 +310,7 @@ void cw_task(void* unused_arg) {
         if (cwp_timer != NULL){ 
             xTimerStart(cwp_timer, 0);
             }
-             xStatus = xQueueReceive(xQpause, &tp_info, portMAX_DELAY); // xQueueReceive empties queue
+        xStatus = xQueueReceive(xQpause, &tp_info, portMAX_DELAY); // xQueueReceive empties queue
     }  // end of while(true)
 } 
 
@@ -378,7 +380,7 @@ void send_CW(char ascii_in) {
         if (cwd_timer != NULL) {
             xTimerStart(cwd_timer, 0);  // define dot length 
             }
-             xStatus = xQueueReceive(xQdit, &tdit_info, portMAX_DELAY); // xQueueReceive empties queue
+         xStatus = xQueueReceive(xQdit, &tdit_info, portMAX_DELAY); // xQueueReceive empties queue
        }
 
 } 
@@ -397,7 +399,7 @@ void cwp_timer_fired_callback(TimerHandle_t timer) {
     {
         uint32_t t_number;
         uint32_t t_state;
-    }; 
+    };   
     struct op timer_info = {1,0};
 
     if (timer == cwp_timer) 
@@ -485,7 +487,7 @@ void cwd_timer_fired_callback(TimerHandle_t timer) {
         if(last == now) {
             vTaskDelay(ms_delay50);  // check switch state every 50 ms
         }
-        else{   //  if previous state |= state switch has changed
+        else{   //  if last |= now switch has changed
             count = 0;
             while(count < 3){
                 last = now;
