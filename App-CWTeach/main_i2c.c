@@ -143,7 +143,7 @@ volatile QueueHandle_t xQphrase5 = NULL;
 // Beginning of each Shuffle
     while (true) {
         sw_state = 1;
-       while (sw_state == 1){
+ /*      while (sw_state == 1){
          uxMessagesWaiting = uxQueueMessagesWaiting(xQsw1);
          vTaskDelay(ms_delay50);  // Break for other tasks
           if(uxMessagesWaiting){
@@ -159,7 +159,7 @@ volatile QueueHandle_t xQphrase5 = NULL;
             sw_state = sw1_buffer;
             }
         }
-        sw_state = 1;
+        sw_state = 1; */
 
         deck_size = DECKSIZE;  //  reset start position of original deck
         next_pos = 0;          // ** reset start position of final deck **
