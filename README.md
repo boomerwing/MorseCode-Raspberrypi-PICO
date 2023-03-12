@@ -20,7 +20,9 @@ This repo contains my base project for [FreeRTOS](https://freertos.org/) on the 
 
 |___/App-CWShuffle          // Source code for App-CWShuffle
 
-|___/Common                 // Source code common to applications
+|___/Common                 // Source code common to applications - pico
+|
+|___/Common-Feather         // Source code common to applications - AdaFruit Feather RP2040
 |
 |___CMakeLists.txt          // Top-level project CMake config file
 |___pico_sdk_import.cmake   // Raspberry Pi Pico SDK CMake import script
@@ -73,9 +75,11 @@ This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatic
 This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows an ADC task to select up to seven messages. A Seven Segment LED module shows the active message number. An LED blinks in response to the morse code being sent. This version of App-Keyer adds a task to Shuffle the Message String selected before sending it to the CW generating task.  To initialize the randomize process, two presses of a switch sets the initial random number. A new randomized string is selected by the ADC task. The PS2 Keyboard is not implemented for this app. The strings are Hard coded in the Shuffle task. The App-CWShuffle has been implemented on the Adafruit Feather RP2040 board instead of the PICO. Also a PIO function is used to generate a 600 Hz square wave as a tone oscillator. A NOR gate is given inputs of the Tone oscillator and the CW code.  The Code signal gates the square wave tone to output the audio Morse siganl.  The blink.pio code is taken directly from pico-examples/pio/pio-blink.
 
 
-### Common: Seven_seg.c
-
+### Common-Feather: Seven_seg.c
 This code configures the Seven Segment LED module and displays the number (HEX or Decimal) sent to it.  My LED Module has two dots.  If your module has no dots or just one, you can use separate LEDs.
+
+### Common: Seven_seg.c
+This code configures the Seven Segment LED module and displays the number (HEX or Decimal) sent to it.  My LED Module has two dots.  If your module has no dots or just one, you can use separate LEDs. Uses the pcf8575 i2c GPIO Extender
 
 ### Common: ps2.c
 This code initializes, then manages the PS2 Keyboard input, decoding the keyboard scan codes and providing an ASCII character output.  This code can be called by an RTOS task.
