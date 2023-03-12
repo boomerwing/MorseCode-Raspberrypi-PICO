@@ -18,6 +18,8 @@ This repo contains my base project for [FreeRTOS](https://freertos.org/) on the 
 
 |___/App-TxtCtl             // Source code for App-TxtCtl
 
+|___/App-CWShuffle          // Source code for App-CWShuffle
+
 |___/Common                 // Source code common to applications
 |
 |___CMakeLists.txt          // Top-level project CMake config file
@@ -65,6 +67,11 @@ This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatic
 ### App Five: App-CWTeach
 
 This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows three switches to select up to eight messages. A Seven Segment LED module shows the active message number. An LED blinks in response to the morse code being sent. This version of App-Keyer adds a Message String random generated alphabet and numbers inserted into phrase No. 7 (The eighth phrase). To initialize the randomize process, two presses of the switch on Port 4 of the GPIO expander sets the initial random number. Then press the switch to put a new randomized string in phrase No. 7. The PS2 Keyboard is not implemented for this app.
+
+### App Six: App-CWShuffle
+
+This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows an ADC task to select up to seven messages. A Seven Segment LED module shows the active message number. An LED blinks in response to the morse code being sent. This version of App-Keyer adds a task to Shuffle the Message String selected before sending it to the CW generating task.  To initialize the randomize process, two presses of a switch sets the initial random number. A new randomized string is selected by the ADC task. The PS2 Keyboard is not implemented for this app. The strings are Hard coded in the Shuffle task. The App-CWShuffle has been implemented on the Adafruit Feather RP2040 board instead of the PICO. Also a PIO function is used to generate a 600 Hz square wave as a tone oscillator. A NOR gate is given inputs of the Tone oscillator and the CW code.  The Code signal gates the square wave tone to output the audio Morse siganl.
+
 
 ### Common: Seven_seg.c
 
