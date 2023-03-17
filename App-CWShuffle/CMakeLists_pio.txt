@@ -16,7 +16,7 @@ add_compile_definitions(BUILD_NUM=${BUILD_NUMBER})
 
 # Include app source code file(s)
 add_executable(${APP_10_NAME}
-    ${APP_10_SRC_DIRECTORY}/main_i2c_pio.c
+    ${APP_10_SRC_DIRECTORY}/main_i2cpio.c
     ${COMMON_CODE_DIRECTORY}/seven_seg.c
 )
 
