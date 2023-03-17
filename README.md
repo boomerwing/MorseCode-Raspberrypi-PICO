@@ -60,7 +60,8 @@ This C app is a programming exercise to create a shuffle function. It can be set
 
 ### App Three: App-TxtCtl
 
-This FreeRTOS C app is a programming exercise to create a Control function responding to text input from a PS2 Keyboard. An RTOS task reads the Keyboard with the RP2040 pio function in Common/PS2.c It commands LEDs in a seven segment display to blink.
+This FreeRTOS C app is a programming exercise to create a Control function responding to text input from a PS2 Keyboard. An RTOS task reads the Keyboard with the RP2040 pio function in Common/PS2.c It commands LEDs in a seven segment display to blink.  The Keyboard code is Based on [PS2Keyboard](https://github.com/PaulStoffregen/PS2Keyboard)
+
 
 ### App Four: App-CWKeyer
 
@@ -72,17 +73,18 @@ This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatic
 
 ### App Six: App-CWShuffle
 
-This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows an ADC task to select up to seven messages. A Seven Segment LED module shows the active message number. An LED blinks in response to the morse code being sent. This version of App-Keyer adds a task to Shuffle the Message String selected before sending it to the CW generating task.  To initialize the randomize process, two presses of a switch sets the initial random number. A new randomized string is selected by the ADC task. The PS2 Keyboard is not implemented for this app. The strings are Hard coded in the Shuffle task. The App-CWShuffle has been implemented on the Adafruit Feather RP2040 board instead of the PICO. Also a PIO function is used to generate a 600 Hz square wave as a tone oscillator. A NOR gate is given inputs of the Tone oscillator and the CW code.  The Code signal gates the square wave tone to output the audio Morse siganl.  The blink.pio code is taken directly from pico-examples/pio/pio-blink.
+This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows a select phrase task to select up to seven messages. A Seven Segment LED module shows the active message number. An LED blinks in response to the morse code being sent. This version of App-Keyer adds a task to Shuffle the Message String selected before sending it to the CW generating task.  To initialize the randomize process, two presses of a switch sets the initial random number. A new randomized string is selected by the phrase select task. The PS2 Keyboard is not implemented for this app. The strings are Hard coded in the Shuffle task. A PIO function is used to generate a 600 Hz square wave as a tone oscillator. A NOR gate is given inputs from the Tone oscillator and the CW code output.  The Code signal gates the square wave tone to output the audio Morse siganl.  The blink.pio code is taken directly from pico-examples/pio/pio-blink.
 
 
 ### Common-Feather: Seven_seg.c
-This code configures the Seven Segment LED module and displays the number (HEX or Decimal) sent to it.  My LED Module has two dots.  If your module has no dots or just one, you can use separate LEDs.
+This code configures the Seven Segment LED module and displays the number (HEX or Decimal) sent to it from an AdaFruit Feather RP2040.  My LED Module has two dots.  If your module has no dots or just one, you can use separate LEDs.
 
 ### Common: Seven_seg.c
-This code configures the Seven Segment LED module and displays the number (HEX or Decimal) sent to it.  My LED Module has two dots.  If your module has no dots or just one, you can use separate LEDs. Uses the pcf8575 i2c GPIO Extender
+This code configures the Seven Segment LED module and displays the number (HEX or Decimal) sent to it by a Raspberry Pi PICO .  My LED Module has two dots.  If your module has no dots or just one, you can use separate LEDs. Uses the pcf8575 i2c GPIO Extender
 
 ### Common: ps2.c
-This code initializes, then manages the PS2 Keyboard input, decoding the keyboard scan codes and providing an ASCII character output.  This code can be called by an RTOS task.
+This code initializes, then manages the PS2 Keyboard input, decoding the keyboard scan codes and providing an ASCII character output.  This code can be called by an RTOS task. This code is Based on [PS2Keyboard](https://github.com/PaulStoffregen/PS2Keyboard)
+
 
 ### Common: pcf8575.c
 This code initializes, then manages the pcf8575 port extender, driving the seven segment LED and providing input ports.
