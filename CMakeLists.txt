@@ -4,48 +4,36 @@ cmake_minimum_required(VERSION 3.14)
 set(PROJECT_NAME "RP2040_FREERTOS_PROJECT")
 set(BUILD_NUMBER "0")
 
-# Set app name(s) and version(s)
-set(APP_1_NAME "TEMPLATE")
-set(APP_1_VERSION_NUMBER "1.4.1")
+set(APP_1_NAME "KEYER_DEMO")
+set(APP_1_VERSION_NUMBER "0.1.0")
 
-set(APP_2_NAME "SCHEDULING_DEMO")
-set(APP_2_VERSION_NUMBER "1.4.1")
+set(APP_2_NAME "SHUFFLE_DEMO")
+set(APP_2_VERSION_NUMBER "0.1.0")
 
-set(APP_3_NAME "IRQS_DEMO")
-set(APP_3_VERSION_NUMBER "1.4.1")
+set(APP_3_NAME "SWI2C_DEMO")
+set(APP_3_VERSION_NUMBER "0.1.0")
 
-set(APP_4_NAME "TIMERS_DEMO")
-set(APP_4_VERSION_NUMBER "1.4.1")
+set(APP_4_NAME "TXTCTL_DEMO")
+set(APP_4_VERSION_NUMBER "0.1.0")
 
-set(APP_5_NAME "KEYERS_DEMO")
+set(APP_5_NAME "CWKEYER_DEMO")
 set(APP_5_VERSION_NUMBER "0.1.0")
 
-set(APP_6_NAME "SHUFFLE_DEMO")
+set(APP_6_NAME "CWTEACHER_DEMO")
 set(APP_6_VERSION_NUMBER "0.1.0")
 
-set(APP_7_NAME "TEXTCTL_DEMO")
+set(APP_7_NAME "MORSE_DEMO")
 set(APP_7_VERSION_NUMBER "0.1.0")
 
-set(APP_8_NAME "SEVENSEG_DEMO")
-set(APP_8_VERSION_NUMBER "0.1.0")
-
-set(APP_9_NAME "CWTEACH_DEMO")
-set(APP_9_VERSION_NUMBER "0.1.0")
-
-set(APP_10_NAME "CWSHUFFLE_DEMO")
-set(APP_10_VERSION_NUMBER "0.1.0")
 
 # Specify the app(s) source code
-set(APP_1_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-Template")
-set(APP_2_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-Scheduling")
-set(APP_3_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-IRQs")
-set(APP_4_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-Timer")
-set(APP_5_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-Keyer")
-set(APP_6_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-Shuffle")
-set(APP_7_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-TextCtl")
-set(APP_8_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-Seven")
-set(APP_9_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-CWTeach")
-set(APP_10_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-CWShuffle")
+set(APP_1_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-Keyer")
+set(APP_2_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-Shuffle")
+set(APP_3_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-SWi2c")
+set(APP_4_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-TxtCtl")
+set(APP_5_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-CWKeyer")
+set(APP_6_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-CWTeach")
+set(APP_7_SRC_DIRECTORY "${CMAKE_SOURCE_DIR}/App-CWShuffle")
 
 # FROM 1.3.0 -- Move common source code to a separate directory
 set(COMMON_CODE_DIRECTORY "${CMAKE_SOURCE_DIR}/Common")
@@ -56,7 +44,7 @@ set(DO_DEBUG "OFF")
 # Set env variable 'PICO_SDK_PATH' to the local Pico SDK
 # Comment out the set() if you have a global copy of the
 # SDK set and $PICO_SDK_PATH defined in your $PATH
-# set(ENV{PICO_SDK_PATH} "${CMAKE_SOURCE_DIR}/pico-sdk")
+#set(ENV{PICO_SDK_PATH} "${CMAKE_SOURCE_DIR}/pico-sdk")
 
 # Set flags and directory variables
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DTSDEBUG")
@@ -103,10 +91,3 @@ add_subdirectory(${APP_4_SRC_DIRECTORY})
 add_subdirectory(${APP_5_SRC_DIRECTORY})
 add_subdirectory(${APP_6_SRC_DIRECTORY})
 add_subdirectory(${APP_7_SRC_DIRECTORY})
-add_subdirectory(${APP_9_SRC_DIRECTORY})
-add_subdirectory(${APP_10_SRC_DIRECTORY})
-
-# Clean up
-unset(FREERTOS_CFG_DIRECTORY)
-unset(FREERTOS_SRC_DIRECTORY)
-unset(APP_SRC_DIRECTORY)
