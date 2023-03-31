@@ -28,7 +28,7 @@
 // ************************************************
 
 #define PAUSE_PERIOD 2800
-#define DOT_PERIOD 67
+#define DOT_PERIOD 64
 #define I2C_ADDR 0x20
 #define SPTOOSIZE 74
 
@@ -112,7 +112,7 @@ void blink_pin_forever(PIO pio, uint sm, uint offset, uint pin, uint freq) {
     char pshc[] = "N6L05XIQVCV8WRG4TEDSFBK1EPBMUO7J79A2G3YVZH\0";
     char pph[SPTOOSIZE];
                                 
-    char *phrases[9] = {pfox,pabc,pnumbers,pve,psha,pshb,pshc,pph,0x0000};
+    char *phrases[8] = {pfox,pabc,pnumbers,pve,psha,pshb,pshc,pph};
     pstrings = phrases;  // transmit just one string pointed to by ptr
 
 //  create random seed with initial Toggle of Switch 3
@@ -317,13 +317,13 @@ void cw_task(void* unused_arg) {
         last_char = 0x40;  // dummy value
         while ((pnext_string[i] != '\0') && (i < SPTOOSIZE)){   // step through TX phrase
             this_char = pnext_string[i]; 
-            printf("%c",this_char);
                 // ********************************************************
                 // Correct between-word SPACE length. Each character ends
                 // with three letter SPACES (a between-letter SPACE) The
                 // first between-word SPACE needs four more between-letter
                 // SPACES, all SPACES after the first SPACE needs seven SPACES.
                 // so they need a new output character.   
+                // ********************************************************
             if((this_char == 0x20) && (last_char == 0x20)) {
                 this_char = 0x21;  // correct SPACE Length
             }
@@ -333,6 +333,7 @@ void cw_task(void* unused_arg) {
                        // ********************************************************
   
             send_CW(this_char);
+            printf("%c",this_char);  // print character after sounding morse code
             i++;  // point to next character
             last_char = this_char; 
         }  // end of while(next_string[i] ...
@@ -382,6 +383,7 @@ void send_CW(char ascii_in) {
 // *********************************************************************************************     
         
         this_char = ascii_in;
+        
         if (this_char == 32) { // look for SPACE char
             this_char = 36;    // index to Morse char
             }
@@ -401,6 +403,7 @@ void send_CW(char ascii_in) {
         else  {
             this_char = 36; 
             }      
+
         morse_out = morse[this_char];     // get Morse char from array
         
     while (morse_out != 1) {              // send Morse bits              
@@ -474,6 +477,7 @@ void cwd_timer_fired_callback(TimerHandle_t timer) {
     UBaseType_t uxNumberOfQSpaces = 1;
 
     const uint8_t  sw_input_mask = 0b00000111;
+    uint8_t first = 0;
     uint8_t select_val;
     uint8_t now;
     uint8_t last;
@@ -487,13 +491,23 @@ void cwd_timer_fired_callback(TimerHandle_t timer) {
       temp_sw_input = pcfbuffer[0]; // protect input values from change
       select_val = (temp_sw_input &= sw_input_mask);
       show_seven_seg_i2c(select_val);
-      last = now;
-      now = select_val;
-      if(now != last){
-            uxNumberOfQSpaces = uxQueueSpacesAvailable( xQphrase5 );
-            if(uxNumberOfQSpaces > 0){
-                xStatus = xQueueSendToFront(xQphrase5,&select_val, 0);
+      if( first == 0) { // send select_val immediately on first measuring select switches
+        now = select_val;
+        first++;
+        uxNumberOfQSpaces = uxQueueSpacesAvailable( xQphrase5 );
+        if(uxNumberOfQSpaces > 0){
+            xStatus = xQueueSendToFront(xQphrase5,&now, 0);
             }
+        }
+       else {  // else only send select_val when switches change
+        last = now;
+        now = select_val;
+        uxNumberOfQSpaces = uxQueueSpacesAvailable( xQphrase5 );
+        if(uxNumberOfQSpaces > 0){
+            xStatus = xQueueSendToFront(xQphrase5,&now, 0);
+            }
+        }
+      if(now != last){
         }
       vTaskDelay(ms_delay300);  // check adc value every 300 ms
     }  // End while (true)    
@@ -616,7 +630,7 @@ int main() {
     PIO pio = pio0;
     uint offset = pio_add_program(pio, &blink_program);
 
-    blink_pin_forever(pio, 0, offset, 12, 600);  // approx 600 Hz
+    blink_pin_forever(pio, 0, offset, 12, 500);  // approx 500 Hz
 //    blink_pin_forever(pio, 0, offset, 18, 3);  // gpio 18
 //    blink_pin_forever(pio, 1, offset, 13, 4);  // gpio 13
 //    blink_pin_forever(pio, 2, offset, 14, 1);  // gpio 14
