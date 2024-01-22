@@ -12,7 +12,7 @@ This repo contains my base project for [FreeRTOS](https://freertos.org/) on the 
 
 |___/App-Keyer              // Source code for App-Keyer
 
-|___/App-Shuffle            // Source code for App-Keyer
+|___/App-Shuffle            // Source code for App-Shuffle
 
 |___/App-SW-i2c             // Source code for App-SW-i2c
 
