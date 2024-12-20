@@ -56,7 +56,7 @@ This C app is a Morse Code CW Keyer used by Radio Amateurs to automatically tran
 
 ### App Two: App-Shuffle
 
-This C app is a programming exercise to create a shuffle function. It can be set to shuffle any length character string (as shown it shuffles a complete Alphabet). It is controlled by two switches which are debounced in separate RTOS tasks. The output is displayed in the Minicom terminal App which is controlled by VT100 codes. The display shows how to use the switches to command the function.
+This C app is a programming exercise to create a shuffle function. It can be set to shuffle any length character string (as shown it shuffles a complete Alphabet). It is controlled by one switch which are debounced in a separate RTOS task (This task debounces eight switches attached to a PCF8575 GPIO extender and distributes the output through Queues. The Shuffle output is displayed in the Minicom terminal App which is controlled by VT100 codes. The display shows how to use the switches to command the function. As well there is a Blink task to blink the Pico LED and two other LEDs as an exercise with tasks.  The Blink task outputs the blink state into a Queue which does not empty so any task can look in the Queue to get a Blink command for its own use.
 
 ### App Three: App-TxtCtl
 
