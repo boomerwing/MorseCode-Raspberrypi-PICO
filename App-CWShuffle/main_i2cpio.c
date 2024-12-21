@@ -370,25 +370,44 @@ void send_CW(char ascii_in) {
     }; 
     struct op tdit_info = {1,1};
 
-    
 // *********************************************************************************************     
 //                        A      B      C     D    E      F      G     H     I     J
     uint32_t morse[] = {0x11D,0x1157,0x45D7,0x457,0x11,0x1175,0x1177,0x455,0x45,0x11DDD,
-//        K      L     M     N      O      P      Q      R     S    T    U      V      W
-       0X11D7,0X115D,0X477,0X117,0X4777,0X22DD,0X11D77,0X45D,0X115,0X47,0X475,0X11D5,0X11DD,
-//      X       Y       Z       0         1        2       3       4     5      6 
-       0X4757,0X11DD7,0X4577,0X477777,0x11DDDD,0X47775,0X11DD5,0X4755,0X1155,0X4557,
-//       7        8         9     SP  SPlg
-       0X11577,0X45777,0X117777,0X10,0X80};
+//                        0      1      2     3    4      5      6     7     8     9
+// *********************************************************************************************     
+//        K      L     M     N      O      P      Q      R     S     T 
+       0X11D7,0X115D,0X477,0X117,0X4777,0X22DD,0X11D77,0X45D,0X115,0X47,
+//       10     11    12    13     14     15     16     17    18    19
+// *********************************************************************************************     
+//        U      V      W     X       Y       Z       0       1        2       3  
+       0X475,0X11D5,0X11DD,0X4757,0X11DD7,0X4577,0X477777,0x11DDDD,0X47775,0X11DD5,
+//       20     21     22    23      24      25      26      27       28      29  
+// *********************************************************************************************     
+//        4      5      6      7        8       9     SP  SPlg    .        , 
+       0X4755,0X1155,0X4557,0X11577,0X45777,0X117777,0X10,0X80,0X11D75D,0X477577,
+//       30     31     32     33       34      35     36   37     38      39 
+// *********************************************************************************************     
+//        ?       /        '
+       0x45775,0X11757,0X15DDDD};
+//        40      41       42
 // *********************************************************************************************     
         
         this_char = ascii_in;
-        
-        if (this_char == 32) { // look for SPACE char
-            this_char = 36;    // index to Morse char
+       
+        if (this_char == 44) { // look for COMMA char
+            this_char = 39;    // index to Morse char
             }
-        else if (this_char == 33) { // look for SPACE char
-            this_char = 37;    // index to Morse char
+        else if (this_char == 46) { // look for PERIOD char
+            this_char = 38;    // index to Morse char
+            }
+        else if (this_char == 63) { // look for QUESTION char
+            this_char = 40;    // index to Morse char
+            }
+        else if (this_char == 47) { // look for FORWARD SLASH char
+            this_char = 41;    // index to Morse char
+            }
+        else if (this_char == 39) { // look for APOSTROPHY char
+            this_char = 42;    // index to Morse char
             }
         else if (isdigit(this_char)) {    // look for Numbers
             this_char = this_char - 22 ;  // index to Morse char
@@ -401,9 +420,9 @@ void send_CW(char ascii_in) {
             this_char = this_char - 65;   // index to Morse char
             }
         else  {
-            this_char = 36; 
+            this_char = 36; // SPACE long
             }      
-
+                
         morse_out = morse[this_char];     // get Morse char from array
         
     while (morse_out != 1) {              // send Morse bits              
