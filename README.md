@@ -21,9 +21,7 @@ This repo contains my base project for [FreeRTOS](https://freertos.org/) on the 
 |___/App-CWShuffle          // Source code for App-CWShuffle
 
 |___/Common                 // Source code common to applications - pico
-|
-|___/Common-Feather         // Source code common to applications - AdaFruit Feather RP2040
-|
+||
 |___CMakeLists.txt          // Top-level project CMake config file
 |___pico_sdk_import.cmake   // Raspberry Pi Pico SDK CMake import script
 |
@@ -74,10 +72,6 @@ This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatic
 ### App Six: App-CWShuffle
 
 This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows a select phrase task to select up to seven messages. A Seven Segment LED module shows the active message number. An LED blinks and an audio tone sounds in response to the morse code being sent. This version of App-Keyer adds a task to Shuffle the Message String selected before sending it to the CW generating task.  To initialize the randomize process, two presses of a switch sets the initial random number. A new randomized string is selected by the phrase select task. The PS2 Keyboard is not implemented for this app. The strings are Hard coded in the Shuffle task. A PIO function is used to generate a 600 Hz square wave as a tone oscillator. A discrete component NAND gate is given inputs from the Tone output GPIO and the CW code GPIO output.  The Code signal gates the square wave tone to output the audio Morse signal.  The blink.pio code is taken directly from pico-examples/pio/pio-blink.
-
-
-### Common-Feather: Seven_seg.c
-This code configures the Seven Segment LED module and displays the number (HEX or Decimal) sent to it from an AdaFruit Feather RP2040.  My LED Module has two dots.  If your module has no dots or just one, you can use separate LEDs.
 
 ### Common: Seven_seg.c
 This code configures the Seven Segment LED module and displays the number (HEX or Decimal) sent to it by a Raspberry Pi PICO .  My LED Module has two dots.  If your module has no dots or just one, you can use separate LEDs. Uses the pcf8575 i2c GPIO Extender
