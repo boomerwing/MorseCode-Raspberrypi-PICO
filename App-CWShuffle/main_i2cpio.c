@@ -187,7 +187,8 @@ void blink_pin_forever(PIO pio, uint sm, uint offset, uint pin, uint freq) {
 // Beginning of each Shuffle
     while (true) {
         // check to see if there is a new phrase selection waiting from switches         
-         uxMessagesWaiting = uxQueueMessagesWaiting(xQphrase5);
+       vTaskDelay(ms_delay50);  // Break for other tasks
+       uxMessagesWaiting = uxQueueMessagesWaiting(xQphrase5);
          if(uxMessagesWaiting){
             xQueueReceive(xQphrase5,&phrase_select, 0); 
             pnext_string = phrases[phrase_select];  // select string to be TX
@@ -264,7 +265,7 @@ void blink_pin_forever(PIO pio, uint sm, uint offset, uint pin, uint freq) {
 
         vTaskDelay(ms_delay300);  // Break for other tasks
       
-   } //   while(true);
+   } //   end while(true);
 }
 
 
