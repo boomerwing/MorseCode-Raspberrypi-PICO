@@ -1,0 +1,23 @@
+@import url("altera.css");
+
+table {
+	border-collapse: collapse;
+}
+th {
+	background-color: navy;
+	color: white;
+}
+body {
+	width: 800px;
+}
+.toc {
+	font-size: 8px;
+}
+h2.title {
+	border-bottom: solid;
+	border-width: 1px;
+}
+.constant {
+	color: gray;
+}
+
