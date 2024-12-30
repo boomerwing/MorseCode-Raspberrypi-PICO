@@ -89,7 +89,7 @@ This code initializes, then manages the pcf8575 port extender, driving the seven
 
 ## Credits
 
-This work has as its foundation the code provided by the smittytone/RP2040-FreeRTOS project.
+This work has as its foundation the code provided by [smittytone/RP2040-FreeRTOS project](https://github.com/smittytone/RP2040-FreeRTOS).
 
 
 ## Copyright and Licences
