@@ -84,9 +84,9 @@ void cw_task(void* unused_arg) {
     char pabc[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\0";
     char pnumbers[] = "0123456789\0";
     char paris[] = "PARIS PARIS PARIS PARIS PARIS\0";
-    char pve[]  = "VE7BGV\0";
-    char pvel[] = "ve7bgv\0";
-    char pcq[] = "CQ CQ CQ DE VE7BGV CQ CQ CQ DE VE7BGV K\0";
+    char pve[]  = "VE7ZYX\0";
+    char pvel[] = "ve7ZYX\0";
+    char pcq[] = "CQ CQ CQ DE VE7ZYX CQ CQ CQ DE VE7ZYX K\0";
     char pph[RING_SIZE];
                                 
     char *phrases[9] = {pfox,pabc,pnumbers,paris,pve,pvel,pcq,pph,0x0000};
@@ -115,20 +115,6 @@ void cw_task(void* unused_arg) {
             while ((pnext_string[i] != 0) && (i < (RING_SIZE-1))){   // step through TX phrase
                 this_char = pnext_string[i]; 
                 printf("%c",this_char);
-                // ********************************************************
-                // Correct between-word SPACE length. Each character ends
-                // with three letter SPACES (a between-letter SPACE) The
-                // first between-word SPACE needs four more between-letter
-                // SPACES, all SPACES after the first SPACE needs seven SPACES.
-                // so they need a new output character.   
-                if((this_char == 0x20) && (last_char == 0x20)) {
-                    this_char = 0x21;  // correct SPACE Length
-                }
-                else if((this_char == 0x20) && (last_char == 0x21)) {
-                    this_char = 0x21;  // correct SPACE Length
-                }
-                       // ********************************************************
-  
                 send_CW(this_char);
                 i++;  // point to next character
                 last_char = this_char;  // to correct "short" SPACE Char
@@ -192,7 +178,7 @@ void send_CW(char ascii_in) {
        0x45775,0X11757,0X15DDDD};
 //        40      41       42
 // *********************************************************************************************     
-        
+         
         this_char = ascii_in;
        
         if (this_char == 44) { // look for COMMA char
