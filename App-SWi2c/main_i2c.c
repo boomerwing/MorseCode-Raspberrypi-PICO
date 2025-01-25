@@ -1,418 +1,541 @@
-/**
- * RP2040 FreeRTOS Timer play
+    /**
+ * RP2040 FreeRTOS Template
  * 
- * @copyright 2022, Calvin McCarthy
- * @version   1.0.0
+ * @copyright 2022, Tony Smith (@smittytone)
+ * @version   1.4.1
  * @licence   MIT
- *
+ *  cd ~/FreeRTOS-Play/build/App-SW  
+ *  
+ * Simulate Reading measurement points, display ADC value, look for
+ * Measurement alarm boundary.  If measurement is less than boundary,
+ * blink seven seg display.  If the measured value moves higher than 
+ * alarm boundary, continue blinking until blinking is acknowledged.
+ *   - main_i2c-E.C changes dot display to second 
+ *     Seven Seg Display, Ports 14 and 15
+ * Also exercises eight switch entries from the GPIO Extender.  There are
+ * individual switch actions and multiple switch actions.  Switch positions
+ * are continually available on the appropriate Queue outputs.
  */
 #include <stdio.h>
 #include "main.h"
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
-#include "../Common/seven_seg.h"
-#include "../Common/pcf8575i2c.h"
+#include "hardware/adc.h" 
+#include "hardware/pwm.h" 
+#include "../Common/Seven_Seg_i2c/seven_seg.h"  
+#include "../Common/PCF8575-i2c/pcf8575i2c.h"
+
+#define HEX_INTERVALS 0X100
+#define DEC_INTERVALS 400
+#define MIN_COUNT 4  
+#define ALARM_BOUNDARY 8
+#define HEX_ALARM_BOUNDARY 0X0008
+#define SW_MASK 0B11111111
+
+
 
 /*
  * GLOBALS
  */
-    // This is the inter-task queue
-volatile QueueHandle_t xQswP1a = NULL;
-volatile QueueHandle_t xQswP1b = NULL;
-volatile QueueHandle_t xQswP2 = NULL;
-volatile QueueHandle_t xQswP3 = NULL;
-volatile QueueHandle_t xQphrase = NULL;
-volatile QueueHandle_t xQdot = NULL;
-volatile QueueHandle_t xQt1 = NULL;
+ 
+// These are the inter-task queues
+volatile QueueHandle_t xQblink = NULL;
+volatile QueueHandle_t xQbin2 = NULL;
+volatile QueueHandle_t xQbin3 = NULL;
+volatile QueueHandle_t xQbin4 = NULL;
+volatile QueueHandle_t xQbin6 = NULL;
+volatile QueueHandle_t xQadc = NULL;
+volatile QueueHandle_t xQsw7 = NULL;
+volatile QueueHandle_t xQsw6 = NULL;
+volatile QueueHandle_t xQsw5 = NULL;
+volatile QueueHandle_t xQsw4 = NULL;
+volatile QueueHandle_t xQsw3 = NULL;
+volatile QueueHandle_t xQsw2 = NULL;
+volatile QueueHandle_t xQsw1 = NULL;
+volatile QueueHandle_t xQsw0 = NULL;
 
+// These are the inter-task queues
+volatile TimerHandle_t xTblink = NULL;
 
+// Set a delay time of exactly 500ms
+const TickType_t ms_delay = 500 / portTICK_PERIOD_MS;
+ 
 // FROM 1.0.1 Record references to the tasks
-TaskHandle_t swP1_task_handle = NULL;
-TaskHandle_t led1_task_handle = NULL;
-TaskHandle_t latch_task_handle = NULL;
-TaskHandle_t led2_task_handle = NULL;
-TaskHandle_t gate1_task_handle = NULL;
-
-    // These are the Send CW timers
-volatile TimerHandle_t phrase_timer;
-volatile TimerHandle_t dot_timer;
-volatile TimerHandle_t t1_timer;
-
+TaskHandle_t blink_task_handle = NULL;
+TaskHandle_t gpio_led_task_handle = NULL;
+TaskHandle_t adc_task_handle = NULL;
+TaskHandle_t sw_debounce_task_handle = NULL;
 
 /*
  * FUNCTIONS
  */
-
-/**
- * @brief Switch Debounce 
- * Repeat check of SW, send result to miso led pin task to stop and start blinking
- * Measures sw state, compares NOW state with PREVIOUS state. If states are different
- * sets count == 0 and looks for two states the same.  It then looks for five or more (MIN_COUNT)
- * in a row or more where NOW and PREVIOUS states are the same. Then Switch state is used
- * as a control signal, passed to an action function by a Queue.
-*/ 
-
- void swP1_debounce(void* unused_arg) {
-    uint8_t now = 1;            // initialize swP1_state
-    uint8_t last = 1;    // initialize swP1_previous_state
-    uint8_t count = 1;   // initialize swP1_final_state
-    uint8_t pcfbuffer[2] = {0b11111111,0b11111111};
-    
-    while (true) {
-        // Measure SW and add the LED state
-        // to the FreeRTOS xQUEUE
-        last = now; 
-        i2c_read_blocking(i2c0, I2C_ADDR, pcfbuffer, 2, true);
-        now = readBit(pcfbuffer[0], P05);
-        if(last == now) {  // Just try again
-
-            vTaskDelay(ms_delay100);  // check switch state every 100 ms
-        }
-        else if(last != now) {  // debounce new switch value
-            count = 0;
-            while(count < 3){
-                last = now;
-                i2c_read_blocking(i2c0, I2C_ADDR, pcfbuffer, 2, true);
-                now = readBit(pcfbuffer[0], P05);
-                if(last == now) { // switch has stopped bouncing
-                    count++;
-                }
-                else{ // switch is still bouncing
-                    count = 0;
-                }
-            vTaskDelay(ms_delay5);  // check switch state every 5 ms
-            }
-            xQueueSendToFront(xQswP1a, &now, 0);
-            xQueueSendToFront(xQswP1b, &now, 0);
-        }  // we only send switch change out, not continuous switch state
-    }  // End while (true)    
-}
-
-/**
- * @brief Do something with the Switch Command
- * Wait for a Switch Change Queue Message
- * When a Switch change is received, Do something
- * Will respond to either HIGH or LOW Switch state
- */
+void switch0(uint8_t);
+void switch1(uint8_t);
+void switch2(uint8_t);
+void switch3(uint8_t);
+void switch4(uint8_t);
+void switch5(uint8_t);
+void switch6(uint8_t);
+void switch7(uint8_t);
+void switchBin2(uint8_t);   // Bits 0,1 of 8 switch group
+void switchBin3(uint8_t);   // Bits 2,3,4 of 8 switch group
+void switchBin4(uint8_t);   // Bits 2,3,4,5 of 8 switch group
+void switchBin6(uint8_t);   // Bits 0,1,2,3,4,5 of 8 switch group
  
- void led1_task(void* unused_arg) {
-    uint8_t passed_value_buffer;
-    uint8_t MsgWaitingkey;
-    uint8_t sw_state;
-    uint8_t pcfbuffer[2] = {0b11111111,0b11111111};
-     
-    while (true) {
-        MsgWaitingkey = uxQueueMessagesWaiting(xQswP1a);
-        if(MsgWaitingkey){ // Look for start Command with Switch 1
-            xQueueReceive(xQswP1a, &passed_value_buffer,0);
-            sw_state = passed_value_buffer;
-            if(sw_state == 0) {  // do something
-                printf(" LED1 task **1** SW1 state = %u  \n", sw_state);
-           }
-            else {  // do something else
-                printf(" LED1 task **1** SW1 state = %u  \n", sw_state);
-            }                  
-        }
-        vTaskDelay(ms_delay100);  // check switch state every 100 ms
-    }  // End while (true)    
-}
-
-/**
- * @brief Latch Task
- * First debounce Switch then only output if there is a Switch DOWN output 
- * stop and start blinking
- * Toggle output at each Switch Down detected
- * 
+/* 
+ * @brief Measure Value of ADC Input 0, 
+ * Display value of ADC on a seven segment LED module.
+ * Set up as a monitoring display. The 7seg display will blink
+ * if the ADC input is less than a pre-selected value.  When input returns
+ * to acceptable value, blink will continue until it is acknowledged.
  */
 
- void latch_task(void* unused_arg) {
-    uint8_t now = 1;            // initialize sw1_state
-    uint8_t last = 1;   // initialize sw1_previous_state
-    uint8_t sw_state = 1;            // initialize sw1_state
-    uint8_t sw_new = 1;            // initialize sw1_state
-    uint8_t sw_old = 1;   // initialize sw1_previous_state
-    uint8_t count = 1;   // initialize sw1_final_state
-    uint8_t pcfbuffer[2] = {0b11111111,0b11111111};
-    
-//   0B0000|0000|0010|0001|0000|1000|0000|0000  16,11 
-    uint32_t dot_mask = 0x00010800;
-    uint32_t dot_LOW = 0x00000000;
-    uint32_t dot_HIGH = 0x00010800; // two dots active
-    
-    while (true) {
-        // Measure SW and add the LED state
-        // to the FreeRTOS xQUEUE
-        last = now;
-        i2c_read_blocking(i2c0, I2C_ADDR, pcfbuffer, 2, true);
-        now = readBit(pcfbuffer[0], P06);
-        if(last == now) {  // Just try again
+void adc_task(void* unused_arg) {
 
-            vTaskDelay(ms_delay100);  // check switch state every 20 ms
-        }
-        else if(last != now) {  // debounce new switch value
-            count = 0;
-            while(count < 3){
-                last = now;
-                i2c_read_blocking(i2c0, I2C_ADDR, pcfbuffer, 2, true);
-                now = readBit(pcfbuffer[0], P06);
-                
-                if(last == now) { // switch has stopped bouncing
-                    count++;
+    uint16_t now = 1 ;
+    uint16_t measured = 1;
+    uint8_t ack_flag = 0;
+    uint8_t sw7_state = 0;
+    uint8_t sw7_buffer = 0;
+    uint8_t blink_buffer = 0;
+    const uint8_t blanked = 20 ;
+   UBaseType_t uxMessagesWaiting  = 0;
+   UBaseType_t xtBlinkStarted  = 0;
+
+    while (true) { 
+        // Measure ADC
+        now = adc_read();
+        xQueueOverwrite(xQadc, &now);
+
+        measured = now/(HEX_INTERVALS);  
+         if(measured < HEX_ALARM_BOUNDARY) {      // ** blink drive  **
+
+            ack_flag = 1;
+            uxMessagesWaiting = uxQueueMessagesWaiting(xQblink);
+            if(uxMessagesWaiting){  // xQueuePeek does not empty Q
+                xQueuePeek(xQblink, &blink_buffer, 0);
+            
+                if(blink_buffer == 0) show_seven_seg(blanked);
+                else show_seven_seg(measured);
                 }
-                else{  // switch is still bouncing
-                    count = 0;
+            }   // ****  end blink drive  **********
+        else {  //  Show values above Alarm  boundary
+       
+            if(ack_flag != 0) {   // ****  Blink until Ack seen  ***
+                if(uxQueueMessagesWaiting(xQblink)){
+                    xQueuePeek(xQblink, &blink_buffer, 0);
+           
+                    if(blink_buffer == 0) show_seven_seg(blanked);
+                    else show_seven_seg(measured);
                 }
-            vTaskDelay(ms_delay5);  // check switch state every 5 ms
-            }
-        // Debounce is complete, now do the Latch output
-            sw_state = now;
-
-            if(sw_state == ON) {
-                sw_new = !sw_old;  // Toggle action
-                sw_old = sw_new;   // Save present state for next comparison
-                if(sw_new == ON) {
-                    xQueueSendToFront(xQswP2, &sw_new, 0);
-                }
-                else if(sw_new == OFF) {
-                    xQueueSendToFront(xQswP2, &sw_new, 0);
-                }
-            }
-        }  // we only send switch change out, not continuous switch state
-        vTaskDelay(ms_delay95);  // check switch state every 100 ms
-    }  // End while (true)    
-}
-
-
-/**
- * @brief Do something with the Latch Switch Command
- * Wait for a Switch DOWN Queue Message
- * When a Switch DOWN is received, Do something
- */
- 
- void led2_task(void* unused_arg) {
-    uint8_t pcfbuffer[2] = {0b11111111,0b11111111};
-    uint8_t xQswP2_buffer;
-    uint8_t MsgWaitingkey;
-    uint8_t sw_state;
-    uint32_t dot_timer_period = 1600;
-    uint32_t phrase_timer_period = 2600;
-    uint32_t period_sw_total;
-    uint32_t period_sw_mask = 0x000E0000;
-    uint32_t period_value_number;
-    uint8_t delay_state;
-    uint8_t DOTL_state;
-    uint8_t DOTR_state;
-
-    struct op
-    {
-        uint32_t t_number;
-        uint32_t t_state;
-    }; 
-    struct op xQdot_info = {1,0};
-    struct op xQphrase_info = {2,0};
-    
-    while (true) {
-        period_sw_total = gpio_get_all(); // Read S1, S2, S3
-        delay_state = (uint8_t)((period_sw_total &= period_sw_mask ) >>17); // Isolate SW values
+                // ** now check Ack switch to acknowledge blinking **
+                if(uxQueueMessagesWaiting(xQsw7)) { // check for ACK, turn ACK flag off
+                    xQueueReceive(xQsw7, &sw7_buffer, portMAX_DELAY);
+                    sw7_state = sw7_buffer;
+                    if (sw7_state == 0) {
+                        ack_flag = 0;
+                        }
+                 }  // end if(uxMessageWaiting)
+              
+            }   //  end if(ack_flag != 0)
+            else show_seven_seg(measured);  // if measure >= ALARM_BOUNDARY
+        }   //  End  Show values above Alarm  boundary
         
-        switch(delay_state) {   // Choose timer delay
-            case 0:
-                dot_timer_period = 200;
-                break;
-            case 1:
-                dot_timer_period = 400;
-                break;
-            case 2:
-                dot_timer_period = 600;
-                break;
-            case 3:
-                dot_timer_period = 800;
-                break;
-            case 4:
-                dot_timer_period = 1000;
-                break;
-            case 5:
-                dot_timer_period = 1200;
-                break;
-            case 6:
-                dot_timer_period = 1400;
-                break;
-            case 7:
-                dot_timer_period = 1600;
-                break;
-            default:
-                dot_timer_period = 1600;            
-            } 
-            
-        MsgWaitingkey = uxQueueMessagesWaiting(xQswP2);  // Latch
-        if(MsgWaitingkey){ // Look for DOWN Command with Switch 2
-            xQueueReceive(xQswP2, &xQswP2_buffer,0);
-            sw_state = xQswP2_buffer;
-            show_seven_seg_i2c(delay_state);  // turn on 0 symbol
-            
-            if(sw_state == ON) { // DOWN Command
-                gpio_put(DOTL, ON);
-                // Timer Delays System ON command. 
-                if (dot_timer != NULL) {  // First Timer to fire
-                    xTimerChangePeriod(dot_timer, dot_timer_period, 0);  // set dot length, start timer
-                     // xQueueReceive signals end of timed interval
-                    xQueueReceive(xQdot, &xQdot_info, portMAX_DELAY); 
-                    gpio_put(DOTL, OFF);
-
-                    printf(" ** System ON ** %x\n",delay_state);               
-                    gpio_put(DOTR, ON);  // show second dot
-                    if (phrase_timer != NULL) { // Second timer fires at the time-out of First timer
-                        xTimerChangePeriod(phrase_timer, phrase_timer_period, 0);  // set dot length, start timer
-                        // xQueueReceive signals end of timed interval
-                       xQueueReceive(xQphrase, &xQphrase_info, portMAX_DELAY); 
-                    gpio_put(DOTR, OFF);
-                    }  
-                }  
-           }
-            else {
-                show_seven_seg_i2c(20);  // turn all LED OFF
-                gpio_put(DOTR, OFF);
-                gpio_put(DOTL, OFF);
-
-                printf(" ** System OFF **\n");
-            }                
-        }
-        vTaskDelay(ms_delay100);  // check switch state every 100 ms
+         vTaskDelay(ms_delay237);  // check adc value every 237 ms
     }  // End while (true)    
 }
-
-/**
- * @brief Do something with the Switch Command
- * Wait for a Switch Change Queue Message
- * When a Switch change is received, Do something
- * Switch DOWN fires first timer(DOTA on), then Second Timer(DOTA off)
- * 
- *                                DOTA on
- * ***************|_________________|***********************************
- *                    first timer              DOTA Off
- * *********************************|_____________|*********************
- *                                    second timer
- */
  
- void gate1_task(void* unused_arg) {
-    uint8_t xQswP1b_buffer;
-    uint8_t MsgWaitingkey;
-    uint8_t sw_state;
-    uint8_t pcfbuffer[2] = {0b11111111,0b11111111};
-    uint32_t t1_timer_period1 = 2000;
-    uint32_t t1_timer_period2 = 200;
-    struct op
-    {
-        uint32_t t_number;
-        uint32_t t_state;
-    }; 
-    struct op xQt1_info = {3,0};
-     
-    while (true) {
-        MsgWaitingkey = uxQueueMessagesWaiting(xQswP1b);
-        if(MsgWaitingkey){ // Look for DOWN Command with Switch 1
-            xQueueReceive(xQswP1b, &xQswP1b_buffer,0);
-            sw_state = xQswP1b_buffer;
-            if(sw_state == ON) {
-                if (t1_timer != NULL) {  // First Timer to fire
-                    xTimerChangePeriod(t1_timer, t1_timer_period1, 0);  // set dot length, start timer
-                     // xQueueReceive signals end of timed interval
-                    xQueueReceive(xQt1, &xQt1_info, portMAX_DELAY);
-                    printf("Gate1 task **3a** if sw_state = %u  timer number %u\n", sw_state, xQt1_info.t_number);
-                    gpio_put(DOTA, ON);  // lights at the end of First timeout
-                }
-                if (t1_timer != NULL) {  // next Timer to fire
-                    xTimerChangePeriod(t1_timer, t1_timer_period2, 0);  // set dot length, start timer
-                     // xQueueReceive signals end of timed interval
-                    xQueueReceive(xQt1, &xQt1_info, portMAX_DELAY);
-                    printf("Gate1 task **3b** if sw_state = %u  timer number %u\n", sw_state, xQt1_info.t_number);
-                    gpio_put(DOTA, OFF);  // extinguises at the end of Second timeout
-                    }
 
-           }
-            else {
-                printf("Gate1 task **3** else sw_state = %u timer number %u\n",sw_state,xQt1_info.t_number);
-            }                  
+/**
+ * @brief Repeatedly flash the Pico's built-in LED.
+ *  Time delay of Flash defined by TaskDelayUntil()
+ *  Message from SW0 sets blink rate either 600ms or 900 ms. 
+ *  xQblink entry remains in Queue buffer until changed so any task can
+ *  have blinking LEDs controlled by the blink_task. 
+ */
+void blink_task(void* unused_arg) {
+    
+    uint8_t sw0_buffer = 0;
+    uint8_t sw1_buffer = 0;
+    uint8_t sw_buffer = 0;
+    uint8_t swbin_buffer = 0;
+    
+    int steps = 450;
+    uint8_t pico_led_state = 0;
+    UBaseType_t uxMessagesWaiting  = 0;
+    
+   // Initialize start time for vTaskDelayUntil
+    TickType_t lastTickTime = xTaskGetTickCount();
+        
+    while (true) {
+        if(uxQueueMessagesWaiting(xQbin2)){  // output of SW 1,2 Binary 0Bxx
+            xQueuePeek(xQbin2, &swbin_buffer,0);
         }
-        vTaskDelay(ms_delay75);  // check switch state every 75 ms
+        
+            switch(swbin_buffer) // four possible blink rates
+            {
+                case (0b00):  // colon
+                    steps = 400;
+                    break;
+                case (0b01):
+                    steps = 600;
+                    break;
+                case (0b10):
+                    steps = 800;
+                    break;
+                case (0b11):
+                    steps = 1000;
+                    break;
+            }
+            pico_led_state = !pico_led_state ;  // Toggle pico led state
+
+        gpio_put(PICO_LED_PIN, pico_led_state); 
+        xQueueOverwrite(xQblink, &pico_led_state);
+        vTaskDelayUntil(&lastTickTime, pdMS_TO_TICKS(steps));
+        }
+} 
+
+
+/**
+ * @brief Alternately flash Right and Left Dots on Seven Seg Display
+ *        based on the value passed via the inter-task xQblink queue.
+ *        
+ */
+void gpio_led_task(void* unused_arg) {  
+    // This variable will take a copy of the value
+    // added to the FreeRTOS Queue
+    uint8_t blink_buffer = 0;
+    uint8_t swbin_buffer = 0;
+    UBaseType_t uxMessagesWaiting = 0;
+    
+    while (true) {
+        // Check for an item in the blink Queue
+        // Read of Queue does not empty it
+        uxMessagesWaiting = uxQueueMessagesWaiting(xQblink);
+        if(uxQueueMessagesWaiting){
+            xQueuePeek(xQblink, &blink_buffer,0);
+        }
+        // Received a value so flash DOTL and DOTR accordingly
+        gpio_put(D14_PIN, blink_buffer == 1 ? 0 : 1);
+        gpio_put(D15_PIN, blink_buffer == 0 ? 0 : 1);
+        vTaskDelay(ms_delay100);  // check Queue input every 100 ms
+
+   }
+}
+
+
+/**
+ * @brief Switch Debounce Repeat check of Buffer[0] of the Port Extender. The port extender
+ * Buffer[0] monitors eight switches. SW7 pushbutton sends ack to stop blinking of ADC Task Output, 
+ * Measures sw state, compares NOW state with PREVIOUS state. If states are different
+ * sets count == 0 and looks for two states the same.  It then looks for MIN_COUNT counts
+ * in a row or more where NOW and PREVIOUS states are the same. Once switch bounce is not observed
+ * the Switch state is passed through a Queue to a function to be used as a control signal.
+ */
+ void sw_debounce_task(void* unused_arg) {
+    uint8_t sw_previous_state = 0b11111111;   // initialize sw_previous_state
+    uint8_t sw_state = 0b11111111;            // initialize sw_state
+    uint32_t count = 5;               // initialize sw_final_state
+    uint8_t pcfbuffer[]={0b11111111,0b11111111};// data buffer, must be two bytes
+    
+    while (true) {
+        // Measure SW and add the LED state
+        // to the FreeRTOS xQUEUE if switch has changed
+        sw_previous_state = sw_state;
+        i2c_read_blocking(i2c0, I2C_ADDR, pcfbuffer, 2, false);
+         sw_state = (pcfbuffer[0] & SW_MASK);
+         
+        if(sw_previous_state == sw_state) {
+            if (count < 10) {
+                count += 1;
+            }
+            else {  // reset cout to MIN_COUNT
+                count = MIN_COUNT;
+             }              //  End if (count < 10)
+          vTaskDelay(ms_delay10);  // check switch state every 10 ms
+         }
+        else  { //  if sw_previous state |= sw_state switch has changed
+        
+             count = 0;  // Need at least MIN_COUNT consecutive same states
+             while(count < MIN_COUNT) {
+                sw_previous_state = sw_state;
+                i2c_read_blocking(i2c0, I2C_ADDR, pcfbuffer, 2, false);
+                 sw_state = (pcfbuffer[0] & SW_MASK);
+                if(sw_previous_state == sw_state){
+                     count++;
+                }
+                 else {
+                     count = 0;
+                 }
+                vTaskDelay(ms_delay10);  // check switch state every 10 ms
+ //           printf(" \n sw_state = %0b", sw_state);
+            }
+
+            switch0(sw_state);
+            switch1(sw_state);
+            switch2(sw_state);
+            switch3(sw_state);
+            switch4(sw_state);
+            switch5(sw_state);
+            switch6(sw_state);
+            switch7(sw_state);
+            switchBin2(sw_state);
+            switchBin3(sw_state);
+            switchBin4(sw_state); 
+            switchBin6(sw_state);
+        }   // end else(sw_previous_state |= sw_state)
+        vTaskDelay(ms_delay50);  // check switch state every 50 ms
     }  // End while (true)    
 }
 
-
-/**
- * @brief Callback actioned when the CW timer fires.  Sends trigger to
- * initiate a new CW String TX.
- *
- * @param timer: The triggering timer.
+/*
+ * SwitchBin2(int)
+ *  Input Switch state value.  The function will Mask out its Switch value 
+ * from sw_state and will send Qmessage to task requiring
+ * switch change. The switch value is expected to remain in the gueue until
+ * changed.  Switches 0,1
  */
-void phrase_timer_fired_callback(TimerHandle_t timer) {
-    struct op
-    {
-        uint32_t t_number;
-        uint32_t t_state;
-    }; 
-    struct op timer_info = {1,0};
+void switchBin2(uint8_t sw_state) { //  Switches 0,1 in 8 switch group
+    uint8_t now = 0 ;
+    
+    now = (sw_state & 0B00000011);
 
-    if (timer == phrase_timer) {
-        // The timer fired so trigger cw ID in led1 task
-        printf(" ** System ON2 ** \n");               
-        xQueueOverwrite(xQphrase, &timer_info);
-       }
+    xQueueOverwrite(xQbin2, &now);
 }
 
-/**
- * @brief Callback actioned when the CW timer fires.  Sends trigger to
- * initiate a new CW String TX.
- *
- * @param timer: The triggering timer.
+/*
+ * SwitchBin3(int)
+ *  Input Switch state value.  The function will Mask out its Switch value 
+ * from sw_state and will send Qmessage to task requiring
+ * switch change. The switch value is expected to remain in the gueue until
+ * changed. Switches 2,3,4
  */
-void dot_timer_fired_callback(TimerHandle_t timer) {
-    struct op
-    {
-        uint32_t t_number;
-        uint32_t t_state;
-    }; 
-    struct op timer_info = {2,0};
+void switchBin3(uint8_t sw_state) { //  Switches 2,3,4 in 8 switch group
+    uint8_t now = 0 ;
+    
+    now = (sw_state & 0B00011100)/4;
 
-    if (timer == dot_timer) {
-        // The timer fired so trigger cw ID in led2 task
-        xQueueOverwrite(xQdot, &timer_info);
-       }
+    xQueueOverwrite(xQbin3, &now);
 }
 
-/**
- * @brief Callback actioned when the CW timer fires.  Sends trigger to
- * initiate a new CW String TX.
- *
- * @param timer: The triggering timer.
+/*
+ * SwitchBin4(int)
+ *  Input Switch state value.  The function will Mask out its Switch value 
+ * from sw_state and will send Qmessage to task requiring
+ * switch change. The switch value is expected to remain in the gueue until
+ * changed. Switches 2,3,4
  */
-void t1_timer_fired_callback(TimerHandle_t timer) {
-    struct op
-    {
-        uint32_t t_number;
-        uint32_t t_state;
-    }; 
-    struct op timer_info = {3,0};
+void switchBin4(uint8_t sw_state) { //  Switches 2,3,4 in 8 switch group
+    uint8_t now = 0 ;
+    
+    now = (sw_state & 0B00111100)/4;
 
-    if (timer == t1_timer) {
-        // The timer fired so trigger cw ID in led2 task
-        xQueueOverwrite(xQt1, &timer_info); 
-       }
+    xQueueOverwrite(xQbin4, &now);
 }
 
-/**
- * @brief Generate and print a debug message from a supplied string.
- *
- * @param msg: The base message to which `[DEBUG]` will be prefixed.
+/*
+ * SwitchBin6(int)
+ *  Input Switch state value.  The function will Mask out its Switch value 
+ * from sw_state and will send Qmessage to task requiring
+ * switch change. The switch value is expected to remain in the gueue until
+ * changed. Switches 2,3,4
  */
-void log_debug(const char* msg) {
-    uint msg_length = 9 + strlen(msg);
-    char* sprintf_buffer = malloc(msg_length);
-    sprintf(sprintf_buffer, "[DEBUG] %s\n", msg);
-//    #ifdef DEBUG
-    printf("%s", sprintf_buffer);
-//    #endif
-    free(sprintf_buffer);
+void switchBin6(uint8_t sw_state) { //  Switches 2,3,4 in 8 switch group
+    uint8_t now = 0 ;
+    
+    now = (sw_state & 0B00111111);
+
+    xQueueOverwrite(xQbin6, &now);
+}
+
+/*
+ * Switch0(uint8_t)
+ *  Input Switch state value.  The function will Mask out its Switch value 
+ * from sw_state and will send Qmessage to task requiring
+ * switch change. The switch value is expected to remain in the gueue until
+ * changed.
+ */
+void switch0(uint8_t sw_state) {
+    uint8_t now = 0 ;
+    
+    if(sw_state & 0B00000001){
+         now = 1;
+     }
+     else {
+         now = 0;
+     }
+        xQueueOverwrite(xQsw0, &now);
+}
+
+/*
+ * Switch1(int)
+ *  Input Switch state value.  The function will Mask out its Switch value 
+ * from sw_state and will send Qmessage to task requiring
+ * switch change. The switch value is expected to remain in the gueue until
+ * changed.
+ */
+void switch1(uint8_t sw_state) {
+    uint8_t now = 0 ;
+    
+    if(sw_state & 0B00000010){
+         now = 1;
+     }
+     else {
+         now = 0;
+     }
+        xQueueOverwrite(xQsw1, &now);
+}
+
+/*
+ * Switch2(int)
+ *  Input Switch state value.  The function will Mask out its Switch value 
+ * from sw_state and will send Qmessage to task requiring
+ * switch change. The switch value is expected to remain in the gueue until
+ * changed.
+ */
+void switch2(uint8_t sw_state) {
+    uint8_t now = 0 ;
+    
+    if(sw_state & 0B00000100){
+         now = 1;
+     }
+     else {
+         now = 0;
+     }
+    xQueueOverwrite(xQsw2, &now);
+}
+
+/*
+ * Switch3(int)
+ *  Input Switch state value.  The function will Mask out its Switch value 
+ * from sw_state and will send Qmessage to task requiring
+ * switch change. The switch value is expected to remain in the gueue until
+ * changed.
+ */
+void switch3(uint8_t sw_state) {
+    uint8_t now = 0 ;
+    uint8_t last = 0;
+    
+    if(sw_state & 0B00001000){
+         now = 1;
+     }
+     else {
+         now = 0;
+     }
+    xQueueOverwrite(xQsw3, &now);
+}
+/*
+ * Switch4(int)
+ *  Input Switch state value.  The function will Mask out its Switch value 
+ * from sw_state and will send Qmessage to task requiring
+ * switch change. The switch value is expected to remain in the gueue until
+ * changed.
+ */
+void switch4(uint8_t sw_state) {
+    uint8_t now = 0 ;
+    
+    if(sw_state & 0B00010000){
+         now = 1;
+     }
+     else {
+         now = 0;
+     }
+    xQueueOverwrite(xQsw4, &now);
+}
+
+/*
+ * Switch5(uint8_t)
+ *  Input Switch state value.  The function will Mask out its Switch value 
+ * from sw_state and will send Qmessage to task requiring
+ * switch change. The switch value is expected to remain in the gueue until
+ * changed.
+ */
+void switch5(uint8_t sw_state) {
+    uint8_t now = 0 ;
+    
+    if(sw_state & 0B00100000){
+         now = 1;
+     }
+     else {
+         now = 0;
+     }
+        xQueueOverwrite(xQsw5, &now);
+}
+
+/*
+ * Switch6(uint8_t)
+ *  Input Switch state value.  The function will Mask out its Switch value 
+ * from sw_state and will send Qmessage to task requiring
+ * switch change. The switch value is expected to remain in the gueue until
+ * changed.
+ */
+void switch6(uint8_t sw_state) {
+    uint8_t now = 0 ;
+    
+    if(sw_state & 0B01000000){
+         now = 1;
+     }
+     else {
+         now = 0;
+     }
+    xQueueOverwrite(xQsw6, &now);
+}
+
+/*
+ * Switch7(int)
+ *  Input Switch state value.  The function will Mask out its Switch value 
+ * from sw_state and will send Qmessage to task requiring
+ * switch change. The switch value is expected to remain in the gueue until
+ * changed.
+ */
+void switch7(uint8_t sw_state) {
+    uint8_t now = 0 ;
+    
+     if(sw_state & 0B10000000){
+         now = 1;
+     }
+     else {
+         now = 0;
+     }
+    xQueueOverwrite(xQsw7, &now);
+}
+
+
+/**
+ * @brief Initialize GPIO Pins for input and output.
+ *        Initialize seven segment display
+ *        Initialize pcf8575 GPIO Extender
+ */
+void configure_gpio(void) {
+    uint8_t pico_led_state = 0;
+
+    // Configure PICO_LED_PIN for Initialization failure warning
+    gpio_init(PICO_LED_PIN);
+    gpio_disable_pulls(PICO_LED_PIN);  // remove pullup and pulldowns
+    gpio_set_dir(PICO_LED_PIN, GPIO_OUT);
+    
+    // Configure D6_PIN for led_task_gpio
+    gpio_init(D14_PIN);
+    gpio_disable_pulls(D14_PIN);  // remove pullup and pulldowns
+    gpio_set_dir(D14_PIN, GPIO_OUT);
+    
+    // Configure D7_PIN for led_task_gpio 
+    gpio_init(D15_PIN);
+    gpio_disable_pulls(D15_PIN);  // remove pullup and pulldowns
+    gpio_set_dir(D15_PIN, GPIO_OUT);
+
+   
+    // Configure ADC
+    adc_init();  
+    adc_gpio_init(26);   
+    adc_select_input(0);
+
+    // Configure GPIO Extender
+    pcf8575_init();
+
+    // Configure Seven Segment display
+    config_seven_seg();
+
 }
 
 
@@ -421,186 +544,121 @@ void log_debug(const char* msg) {
  */
 int main() {
     uint32_t error_state = 0;
-    uint32_t pico_led_state = 0;
-    uint32_t t1_period;
-    struct op
-    {
-        uint32_t sw_number;
-        uint32_t sw_state;
-    }; 
-    struct op sw_info = {0,0};
-   
-//   0B0000|0000|0011|0001|0011|1000|0000|0000  16,11,12,13,20,21 
-    const uint32_t dot_mask = 0x00393800;
-//   0B0000|0000|0000|1110|0000|0000|0000|0000  19,18,17 
-    const uint32_t sw_mask = 0x000E0000;
-//   0B0000|0000|0011|1111|0011|1000|0000|0000  11,12,13,16,17,18,19,20,21 
-    const uint32_t init_mask = 0x003F3800;
-
-
-    // Enable STDIO
-    stdio_init_all();
-
-    pcf8575_init();
+    uint8_t pico_led_state = 0;
     
-    stdio_usb_init();
+    stdio_usb_init(); 
     // Pause to allow the USB path to initialize
     sleep_ms(2000);
     
-     // Configure LED DOTS
-    gpio_init_mask(init_mask);  // 11, 16 DOTL, DOTR
-    gpio_set_dir_out_masked(dot_mask);
-
-    gpio_disable_pulls(DOTL);  // remove pullup and pulldowns
-    gpio_disable_pulls(DOTR);  // remove pullup and pulldowns
-    gpio_disable_pulls(DOTA);  // remove pullup and pulldowns
-    gpio_disable_pulls(DOTF);  // remove pullup and pulldowns
-    gpio_disable_pulls(DOTD);  // remove pullup and pulldowns
-    gpio_disable_pulls(DOTC);  // remove pullup and pulldowns
-   
-     // Configure SW0,SW1,SW2
-    gpio_set_dir_in_masked(sw_mask);
-    gpio_pull_up(SW0);  // pullup
-    gpio_pull_up(SW1);  // pullup
-    gpio_pull_up(SW2);  // pullup
-   
+    configure_gpio();
     
-    show_seven_seg_i2c(20);  // turn all LED OFF
-    gpio_put(DOTR, 1);
-    gpio_put(DOTL, 1);
-    gpio_put(DOTA, 1);
-    gpio_put(DOTF, 1);
-    gpio_put(DOTD, 1);
-    gpio_put(DOTC, 1);
-                
-   // label Program Screen
-    printf("\x1B[2J");  // Clear Screen 
-    printf("\x1B[%i;%iH",2,3);  // place curser
-    printf("*** Switch Debounce and Latch *****");
-    printf("\x1B[%i;%iH",4,3);  // place curser
-    printf("**************************************");
-    printf("\x1B[%i;%ir",6,15);  // set top and bottom lines of window
+        // label Program Screen
+    printf("\x1B[2J");  // Clear Screen
+    printf("\x1B[%i;%iH", 2,3);  // place curser
+    printf("*** Switch Play Program ***");
+    printf("\x1B[%i;%iH",4,2);  // place curser
+    printf("**************************************\n");
+    printf("\x1B[%i;%ir",5,18); // set window top and bottom lines
+    printf("\x1B[%i;%iH",5,0);  // place curser
 
-// Timer creates pause between repetition of the CW Text
-    phrase_timer = xTimerCreate("PHRASE_TIMER", 
-                            PAUSE_PERIOD,
-                            pdFALSE,
-                            (void*)PHRASE_TIMER_ID,
-                            phrase_timer_fired_callback);
-        if (phrase_timer == NULL) {
-            error_state  += 1;
-            }
-            
-
-// Timer creates dot length
-    dot_timer = xTimerCreate("DOT_TIMER", 
-                            DOT_PERIOD,
-                            pdFALSE,
-                            (void*)DOT_TIMER_ID,
-                            dot_timer_fired_callback);
-        if (dot_timer == NULL) {
-            error_state  += 1;
-            }
-            
-// Timer creates dot length
-    t1_timer = xTimerCreate("T1_TIMER", 
-                            t1_period,
-                            pdFALSE,
-                            (void*)T1_TIMER_ID,
-                            t1_timer_fired_callback);
-        if (t1_timer == NULL) {
-            error_state  += 1;
-            }
-            
+  
     // Set up tasks
     // FROM 1.0.1 Store handles referencing the tasks; get return values
     // NOTE Arg 3 is the stack depth -- in words, not bytes
-    BaseType_t swP1_status = xTaskCreate(swP1_debounce, 
-                                         "SW1_TASK", 
-                                         256, 
+    BaseType_t blink_status = xTaskCreate(blink_task, 
+                                         "BLINK_TASK", 
+                                         128, 
                                          NULL, 
-                                         8,     // Task priority
-                                         &swP1_task_handle);
-        if (swP1_status != pdPASS) {
-           error_state  += 1;
+                                         8, 
+                                         &blink_task_handle);
+        if (blink_status != pdPASS) {
+            error_state  += 1;
             }
-
-      BaseType_t  led1_status = xTaskCreate(led1_task, 
-                                         "LED1_TASK", 
-                                         256, 
-                                         NULL, 
-                                         6,     // Task priority
-                                         &led1_task_handle);
-        if (led1_status != pdPASS) {
-           error_state  += 1;
-            }
-           
-     BaseType_t  latch_status = xTaskCreate(latch_task, 
-                                         "LATCH_TASK", 
+             
+    BaseType_t adc_status = xTaskCreate(adc_task,              
+                                         "ADC_TASK", 
                                          256, 
                                          NULL, 
                                          7,     // Task priority
-                                         &latch_task_handle);
-        if (latch_status != pdPASS) {
-           error_state  += 1;
+                                         &adc_task_handle);
+        if (adc_status != pdPASS) {
+            error_state  += 1;
             }
-            
-      BaseType_t  led2_status = xTaskCreate(led2_task, 
-                                         "LED2_TASK", 
+             
+    BaseType_t gpio_status = xTaskCreate(gpio_led_task, 
+                                         "GPIO_LED_TASK", 
+                                         128, 
+                                         NULL, 
+                                         6, 
+                                         &gpio_led_task_handle);
+    
+        if (gpio_status != pdPASS) {
+            error_state  += 1;
+            }
+             
+    BaseType_t sw_status = xTaskCreate(sw_debounce_task, 
+                                         "SW_DEBOUNCE_TASK", 
                                          256, 
                                          NULL, 
                                          5,     // Task priority
-                                         &led2_task_handle);
-        if (led2_status != pdPASS) {
+                                         &sw_debounce_task_handle);
+        if (sw_status != pdPASS) {
            error_state  += 1;
             }
-           
-      BaseType_t  gate1_status = xTaskCreate(gate1_task, 
-                                         "GATE1_TASK", 
-                                         256, 
-                                         NULL, 
-                                         4,     // Task priority
-                                         &gate1_task_handle);
-        if (gate1_status != pdPASS) {
-           error_state  += 1;
-            }
-           
-             
-  
-   // Set up the event queue
-    xQswP1a = xQueueCreate(1, sizeof(uint8_t)); 
-    if (xQswP1a == NULL) error_state += 1;
+    
+    
+    // Set up the  queues
+     
+    xQblink = xQueueCreate(1, sizeof(uint8_t));
+    if ( xQblink == NULL ) error_state += 1;
 
-    xQswP1b = xQueueCreate(1, sizeof(uint8_t)); 
-    if (xQswP1b == NULL) error_state += 1;
+    xQsw0 = xQueueCreate(1, sizeof(uint8_t)); 
+    if ( xQsw0 == NULL ) error_state += 1;
 
-    xQswP2 = xQueueCreate(1, sizeof(uint8_t)); 
-    if (xQswP2 == NULL) error_state += 1;
+    xQsw1 = xQueueCreate(1, sizeof(uint8_t)); 
+    if ( xQsw1 == NULL ) error_state += 1;
 
-    xQt1= xQueueCreate(1, sizeof(uint8_t)); 
-    if (xQt1 == NULL) error_state += 1;
+    xQsw2 = xQueueCreate(1, sizeof(uint8_t)); 
+    if ( xQsw2 == NULL ) error_state += 1;
 
-    xQphrase = xQueueCreate(1, sizeof(sw_info)); 
-    if ( xQphrase == NULL ) error_state += 1;
+    xQsw3 = xQueueCreate(1, sizeof(uint8_t)); 
+    if ( xQsw3 == NULL ) error_state += 1;
 
-    xQdot = xQueueCreate(1, sizeof(sw_info)); 
-    if ( xQdot == NULL ) error_state += 1;
+    xQsw4 = xQueueCreate(1, sizeof(uint8_t)); 
+    if ( xQsw4 == NULL ) error_state += 1;
 
+    xQsw5 = xQueueCreate(1, sizeof(uint8_t)); 
+    if ( xQsw5 == NULL ) error_state += 1;
 
-    // Start the FreeRTOS scheduler
-    // FROM 1.0.1: Only proceed if no tasks signal error in setup
+    xQsw6 = xQueueCreate(1, sizeof(uint8_t)); 
+    if ( xQsw6 == NULL ) error_state += 1;
+
+    xQsw7 = xQueueCreate(1, sizeof(uint8_t)); 
+    if ( xQsw7 == NULL ) error_state += 1;
+
+    xQbin2 = xQueueCreate(1, sizeof(uint8_t)); 
+    if ( xQbin2 == NULL ) error_state += 1;
+
+    xQbin3 = xQueueCreate(1, sizeof(uint8_t)); 
+    if ( xQbin3 == NULL ) error_state += 1;
+
+    xQbin4 = xQueueCreate(1, sizeof(uint8_t)); 
+    if ( xQbin4 == NULL ) error_state += 1;
+
+    xQbin6 = xQueueCreate(1, sizeof(uint8_t)); 
+    if ( xQbin6 == NULL ) error_state += 1;
+
+    xQadc = xQueueCreate(1, sizeof(uint16_t)); 
+    if ( xQadc == NULL ) error_state += 1;
+    
+  // Start the FreeRTOS scheduler
+    // FROM 1.0.1: Only proceed with valid tasks
     if (error_state == 0) {
         vTaskStartScheduler();
     }
-    else {   // if tasks don't initialize, light pico board led
-    // Configure PICO_LED_PIN for Initialization failure warning
-        gpio_init(PICO_LED_PIN);
-        gpio_disable_pulls(PICO_LED_PIN);  // remove pullup and pulldowns
-        gpio_set_dir(PICO_LED_PIN, GPIO_OUT);
-   
+    else {   // if tasks don't initialize, pico board led will light   
         pico_led_state = 1;
         gpio_put(PICO_LED_PIN, pico_led_state);
-        while (true);
     }
     
     // We should never get here, but just in case...
