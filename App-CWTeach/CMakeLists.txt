@@ -16,15 +16,14 @@ add_compile_definitions(BUILD_NUM=${BUILD_NUMBER})
 
 # Include app source code file(s)
 add_executable(${APP_6_NAME}
-    ${APP_6_SRC_DIRECTORY}/main_i2c.c
-    ${COMMON_CODE_DIRECTORY}/pcf8575i2c.c
-    ${COMMON_CODE_DIRECTORY}/seven_seg.c
+    ${APP_6_SRC_DIRECTORY}/main_pio.c
 )
 
 # Link to built libraries
 target_link_libraries(${APP_6_NAME} LINK_PUBLIC
     pico_stdlib
-    hardware_i2c
+    hardware_pio
+    hardware_clocks
     FreeRTOS)
 
 # Enable/disable STDIO via USB and UART
