@@ -48,28 +48,28 @@ To use the code in this repo, your system must be set up for RP2040 C/C++ and Fr
 
 This repo includes a number of deployable apps.
 
-### App One: App-Keyer
+### App-Keyer
 
 This C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows three switches to select up to eight messages. A Seven Segment LED module shows the message number and two LED dots blink in response to the morse code being sent.
 
-### App Two: App-Shuffle
+### App-Shuffle
 
-This C app is a programming exercise to create a shuffle function. It can be set to shuffle any length character string (as shown it shuffles a complete Alphabet). It is controlled by one switch which are debounced in a separate RTOS task (This task debounces eight switches attached to a PCF8575 GPIO extender and distributes the output through Queues. The Shuffle output is displayed in the Minicom terminal App which is controlled by VT100 codes. The display shows how to use the switches to command the function. As well there is a Blink task to blink the Pico LED and two other LEDs as an exercise with tasks.  The Blink task outputs the blink state into a Queue which does not empty so any task can look in the Queue to get a Blink command for its own use.
+This C app is a programming exercise to create a shuffle function. It can be set to shuffle any length character string (as shown it shuffles a complete Alphabet). It is controlled by one switch which is debounced in a separate RTOS task (This task debounces eight switches attached to a PCF8575 GPIO extender and distributes the output through Queues. The Shuffle output is displayed in the Minicom terminal App which is controlled by VT100 codes. The display shows how to use the switches to command the function. As well there is a Blink task to blink the Pico LED and two other LEDs as an exercise with tasks.  The Blink task outputs the blink state into a Queue which does not empty so any task can look in the Queue to get a Blink command for its own use.
 
-### App Three: App-TxtCtl
+### App-TxtCtl
 
 This FreeRTOS C app is a programming exercise to create a Control function responding to text input from a PS2 Keyboard. An RTOS task reads the Keyboard with the RP2040 pio function in Common/PS2.c It commands LEDs in a seven segment display to blink.  The Keyboard code is Based on [PS2Keyboard](https://github.com/PaulStoffregen/PS2Keyboard)
 
 
-### App Four: App-CWKeyer
+### App-CWKeyer
 
 This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows three switches to select up to eight messages. A Seven Segment LED module shows the message number. An LED blinks in response to the morse code being sent. This version of App-Keyer adds PS2 Keyboard input of a Message String in phrase No. 7. Enter the string while strings 0-6 are being output. The PS2 Keyboard is being managed by a PIO input.
 
-### App Five: App-CWTeach
+### App-CWTeach
 
-This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows three switches to select up to eight messages. A Seven Segment LED module shows the active message number. An LED blinks in response to the morse code being sent. This version of App-Keyer adds a Message String random generated alphabet and numbers inserted into phrase No. 7 (The eighth phrase). To initialize the randomize process, two presses of the switch on Port 4 of the GPIO expander sets the initial random number. Then press the switch to put a new randomized string in phrase No. 7. The PS2 Keyboard is not implemented for this app.
+This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. There are 30 strings making up one long message.  This program sends the long message as a Morse Code message for teaching purposes.  The audio tone in created by a PIO output which is fed into an external gate which switches the tone off and on as the code output GPIO drives it.  There is a graphic to describe the two transistor gate.
 
-### App Six: App-CWShuffle
+### App-CWShuffle
 
 This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows a select phrase task to select up to seven messages. A Seven Segment LED module shows the active message number. An LED blinks and an audio tone sounds in response to the morse code being sent. This version of App-Keyer adds a task to Shuffle the Message String selected before sending it to the CW generating task.  To initialize the randomize process, two presses of a switch sets the initial random number. A new randomized string is selected by the phrase select task. The PS2 Keyboard is not implemented for this app. The strings are Hard coded in the Shuffle task. A PIO function is used to generate a 600 Hz square wave as a tone oscillator. A discrete component NAND gate is given inputs from the Tone output GPIO and the CW code GPIO output.  The Code signal gates the square wave tone to output the audio Morse signal.  The blink.pio code is taken directly from pico-examples/pio/pio-blink.
 
