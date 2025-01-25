@@ -25,7 +25,7 @@
 #include "blink.pio.h"
 // ***********************************************
 
-#define PAUSE_PERIOD 2800
+#define PAUSE_PERIOD 1000
 #define DOT_PERIOD 60
 #define SPTOOSIZE 130
 #define TONE_FREQ 500
@@ -133,7 +133,7 @@ void phrases_task(void* unused_arg) {
 }
 
 /**
- * @brief Send CW, blinking RX LED 
+ * @brief Send CW, blinking RX LED, switching audio tone ON and OFF 
  *        xQtimer1 triggers TX of phrase sent from Phrases task.
  */
   
@@ -158,18 +158,18 @@ void cw_task(void* unused_arg) {
     char **pstrings;
     char *pnext_string; 
     
-    vTaskDelay(ms_delay300);
     uint32_t first_flag  = 1;
     uint32_t timer_flag  = 0;
     
+    vTaskDelay(ms_delay300);
+    
    while (true) {
-        // first check to see if there is a new phrase waiting from shuffle task
+        // first check to see if there is a new phrase waiting from phrase select task
           if(uxQueueMessagesWaiting(xQphrases)){
             for(i=0;i<SPTOOSIZE; i++) { // purge pph buffer
                 pph[i] = '\0'; // fill buffer with string end char
             }
            xStatus = xQueueReceive(xQphrases,pph, 0);
-            vTaskDelay(ms_delay300);
             pnext_string = pph;  // select string to be TX
          }
          else{
@@ -187,7 +187,7 @@ void cw_task(void* unused_arg) {
         }  // end of while(next_string[i] ...
         printf("\n");
      
-        // Trigger one-shot timer to delay next CW text output
+        // Trigger one-shot timer to delay next CW text phrase output
         if (cwp_timer != NULL){ 
             xTimerStart(cwp_timer, 0);
             }
@@ -386,6 +386,12 @@ int main() {
     uint32_t error_state = 0;
     uint32_t pico_led_state = 0;
     char pph[SPTOOSIZE];
+    struct op
+    {
+        uint32_t sw_number;
+        uint32_t sw_state;
+    }; 
+    struct op sw_info = {0,0};
 
     configure_gpio();
     
