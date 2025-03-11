@@ -1,29 +1,34 @@
 /**
- * RP2040 FreeRTOS Template: Send CW with Timer trigger
- * Timer is monostable, creating delay between text sent
- * Also learning to use structures in Queue
- * Sending Morse Code text
- * Text selected by value read in by ADC
- * 
+ * RP2040 FreeRTOS Keyer Experiments
  * built on 
  * @copyright 2022, Tony Smith (@smittytone)
  * @version   1.2.0
  * @licence   MIT
- *
+ * cd ~/FreeRTOS-CW-Play/build/App-Keyer
+ * 
+ * Program sends CW text Practice phrases selected by Sw0 to SW2.
+ * Sw5 selects slow speed or fast speed of characters
+ * The seven seg LED display shows the phrase number selected
+ * the PICO LED is lit for Slow CW
+ * The switches are read by the PCF8575 GPIO Extender
+ * CLock output provides the 500 Hz audio tone.
+ * An external two input NAND Gate controls the CW tone
+ * 
  */
 #include <stdio.h>
 #include "main.h"
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
-#include "../Common/seven_seg.h"
-#include "../Common/pcf8575i2c.h"
+#include "hardware/clocks.h"
+#include "../Common/Seven_Seg_i2c/seven_seg.h"
+#include "../Common/PCF8575_i2c/pcf8575i2c.h"
 
-#define INTERVALS 6plin
-#define PAUSE_PERIOD 2800
-#define DOT_PERIOD 75
-#define SENTENCE 1
-#define I2C_ADDR 0x20
-
+#define PAUSE_PERIOD 1000
+#define DOT_PERIOD 68   // about 20 WPM
+#define DOT_TIMER_ID    0
+#define PAUSE_TIMER_ID  1
+#define	DOTR		   14
+#define	DOTL		   15
 
 
 /* 
@@ -34,15 +39,14 @@ TaskHandle_t cw_task_handle = NULL;
 TaskHandle_t select_phrase_task_handle = NULL;
 
     // These are the Send CW timers
-volatile TimerHandle_t cw1_timer;
-volatile TimerHandle_t cw2_timer;
+volatile TimerHandle_t pause_timer;
+volatile TimerHandle_t dot_timer;
 
     // These are the inter-task queues
-volatile QueueHandle_t xQtimer1 = NULL;
-volatile QueueHandle_t xQtimer2 = NULL;
-volatile QueueHandle_t xQueue3 = NULL;
-volatile QueueHandle_t xQueue4 = NULL;
-volatile QueueHandle_t xQphrase5 = NULL;
+volatile QueueHandle_t xQpausetimer = NULL;
+volatile QueueHandle_t xQdottimer = NULL;
+volatile QueueHandle_t xQspeed = NULL;
+volatile QueueHandle_t xQphrase = NULL;
 
 
 
@@ -60,8 +64,9 @@ void cw_task(void* unused_arg) {
     uint32_t i  = 1;
     uint32_t number  = 1;
     uint32_t phrase_select  = 1;
-    char this_char = 0;
-    char last_char = 0;
+    uint32_t speed_select  = 1;
+    uint8_t this_char = 0;
+    uint8_t last_char = 0;
     struct op
     {
         uint32_t t_number;
@@ -72,16 +77,46 @@ void cw_task(void* unused_arg) {
     // Selection of Texts
     char **pstrings;
     char *pnext_string;
+/**    
+    char p00[] = "AUTVA EUTAH UTMOA UTAAT OUSET UATIV IVEUT AISHV UIUES SAMET MEVIU TAVAU\0";
+    char p01[] = "MAUVA AIVIS UAUEV OVTUA VAUAS AVUAV UEATS UEAVS MIVAS SUAVS VITES AUOMI\0";
+    char p02[] = "SAUVS HEOAV VIVSU AVAUE IUISE VIVAU MISAV OSTEA MAVIU OTESA HVTAU SEVUI\0";
+    char p03[] = "INANE DABEN DIVON TNIBE ESIBN VASBI TONID SHEDV SEDON OBDSI\0";
+    char p04[] = "ENABD DBEBI ISHND OBIUD NTODN ADIBD DANBU ANDEB MINAD BADIV\0";
+    char p05[] = "ONESD BIDEN EDMNA DASNB SNEBT ADTDS ADNIN HADNB SMDBA MIDOB\0";
+    char p06[] = "imoti EMSTI TMSIE ISHES SITOS ISTEM ITIME MESEI EMIES SHEME\0";
+*/    
     
-    char pfox[] = "THE QUICK BROWN FOX JUMPED OVER THE LAZY DOGS BACK 0123456789\0";
-    char pabc[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\0";
-    char pnumbers[] = "0123456789\0";
-    char paris[] = "PARIS PARIS PARIS PARIS PARIS\0";
-    char pve[]  = "VE7BGV\0";
-    char pvel[] = "ve7bgv\0";
-    char pcq[] = "CQ CQ CQ DE VE7BGV CQ CQ CQ DE VE7BGV K\0";
-    char pph[] = "CQ CQ CQ DE VE7BGV\0";
-    char *phrases[9] = {pfox,pabc,pnumbers,paris,pve,pvel,pcq,pph,0x0000};
+    char p00[] = "FAFHR DALIN RLFWE LEFWI DEWTW TROLF FIFAL FRFIL SBRTW NRWTJ\0";
+    char p01[] = "SFOWH IRELT SBLWJ JBAFR BSJWU JAMBR WIENH IJFWS RWJBF FRWJL\0";
+    char p02[] = "REROH RASIB JOLIR TRILF ITEMF LFRMB FLRRF JBRLF\0";
+    char p03[] = "HEWSP MIWOJ SUEJT BADIJ OBPSI WIDJE ESIBW JABIP\0";
+    char p04[] = "MIWAP OBIJD SEJOP TWIEP SHEDJ ISHJW ANPEW EJMPD\0";
+    char p05[] = "WISJP JEPAW WEPBJ BOSVP JASIB IWATE EWADP EJIDB\0";
+    char p06[] = "PJPWJ PWWPJ NTOWJ SMWJA DIJOP HAWNB WEPJT ODBWS\0";
+    
+/**    
+    char p00[] = "THE QUICK BROWN FOX JUMPED OVER THE LAZY DOGS BACK 0123456789\0";
+    char p01[] = "MOIST THEME MOTTO HOIST THOSE THESE SHOOT SHOES SHEET THEME\0";
+    char p02[] = "SMOTE SMITE SOOTH TOTEM TOOTH TITHE MITES METES MISTS MOOSE\0";
+    char p03[] = "MOTET SISOM SMITT STOOM MOOTS SHOTS SMITH MEETS TEETH TESTS\0";
+    char p04[] = "OSTEI SOMET IOHOH TIHME OMEST ISIME HSMOI TMEHI EIMSO MOTIS\0";
+    char p05[] = "STOMO SMIEI HEMTO IMSHE IMISI OESIM ESITE MOTHM hitem etihm\0";
+    char p06[] = "imoti EMSTI TMSIE ISHES SITOS ISTEM ITIME MESEI EMIES SHEME\0";
+*/
+
+/**
+    char p00[] = "TKCKG FLUFG GFKRG KUART CVKCL CEGIK GURKE CRUFE LFURG LOGUK KLGCK\0";
+    char p01[] = "FLKGC LOGOK GVGEU KURFK RFVUK LKFGC GKLRF KUKUE CGKRU RVCLF CLGKF\0";
+    char p02[] = "GVKLR KURIG GUGGK VOTSG KUOGK KUACG GKVUC KFCKL RGFKV GRUKC KGIKC\0";
+    char p03[] = "YOYOP QUCHT ZADNY SGYEH JAWYZ XLFRX ZOXSH FETYQ HETOP FLUGX ZEXIZ\0";
+    char p04[] = "CRYQG YESTY XONIC ZUZPC GVUBZ PLAZR PURXC XAXXA ХІМР5 WAZIW ISYGL\0";
+    char p05[] = "DALQP JAZIJ TOPIG XTZEX BJKRU QTYIX VAXIU BUXIZ SHXYZ CEZIG FZRVQ\0";
+    char p06[] = "TCMGQ QGFLX GVGZX QYTXZ ҮҮРЕЕ QLYTM ZEXIZ YILOX GIRFL FZRVQ\0";
+*/ 
+   
+    char pph[] = "hitem etihm imoti CQ CQ CQ K\0";
+    char *phrases[8] = {p00,p01,p02,p03,p04,p05,p06,pph};
     pstrings = phrases;  // transmit just one string pointed to by ptr
     
     vTaskDelay(ms_delay300);
@@ -91,40 +126,32 @@ void cw_task(void* unused_arg) {
     
    while (true) {
          if(timer_flag == 0) {  // Timer has triggered timeout
-            xQueuePeek(xQphrase5, &phrase_select, portMAX_DELAY); 
+            xQueuePeek(xQphrase, &phrase_select, portMAX_DELAY); 
             pnext_string = phrases[phrase_select];  // select string to be TX
             i = 0;  // sets up start of TX phrase
             last_char = 0x40;  // dummy value
             while (pnext_string[i] != 0) {   // step through TX phrase
                 this_char = pnext_string[i]; 
-                printf("%c",this_char);
-                // ********************************************************
-                // Correct between-word SPACE length. Each character ends
-                // with three letter SPACES (a between-letter SPACE) The
-                // first between-word SPACE needs four more between-letter
-                // SPACES, all SPACES after the first SPACE needs seven SPACES.
-                // so they need a new output character.   
-                if((this_char == 0x20) && (last_char == 0x20)) {
-                    this_char = 0x21;  // correct SPACE Length
-                }
-                else if((this_char == 0x20) && (last_char == 0x21)) {
-                    this_char = 0x21;  // correct SPACE Length
-                }
-                       // ********************************************************
                           
                 send_CW(this_char);
+                this_char = toupper(this_char);
+                printf("%c",this_char);
+             //  Speed_select SW (6) HIGH == Slow  ****************
+                xQueuePeek(xQspeed, &speed_select, portMAX_DELAY); 
+                if(speed_select) send_CW(0x20);  // add a SPACE CHAR
+             // ***************************************************                
                 i += 1;  // point to next character
                 last_char = this_char;  // to correct "short" SPACE Char
-            }  // end of while(next_string[i] ...
+                }  // end of while(next_string[i] ...
             printf("\n");
      
                 // Start the monostable timer
-        } // end of if(timer_flag == 0) ...
+            } // end of if(timer_flag == 0) ...
         // Trigger one-shot timer to delay next CW text output
-        if (cw1_timer != NULL) xTimerStart(cw1_timer, 0);
-        xQueueReceive(xQtimer1, &t1_info, portMAX_DELAY); // xQueueReceive empties queue
+        if (pause_timer != NULL) xTimerStart(pause_timer, 0);
+        xQueueReceive(xQpausetimer, &t1_info, portMAX_DELAY); // xQueueReceive empties queue
         timer_flag = t1_info.t_state;
-        t1_info.t_state = 1;
+
     }  // end of while(true)
 }
 
@@ -136,7 +163,7 @@ void cw_task(void* unused_arg) {
  * the flag to indicate that the letter is completely sent.
  *
  */
-void send_CW(char ascii_in) {
+void send_CW(const char ascii_in) {
     uint32_t masknumber = 0x00000001;
     uint8_t this_char = 0;
     uint32_t bit_out = 1;
@@ -148,44 +175,52 @@ void send_CW(char ascii_in) {
     }; 
     struct op t1_info = {1,1};
 
-// *********************************************************************************************     
-//                        A      B      C     D    E      F      G     H     I     J
-    uint32_t morse[] = {0x11D,0x1157,0x45D7,0x457,0x11,0x1175,0x1177,0x455,0x45,0x11DDD,
-//                        0      1      2     3    4      5      6     7     8     9
-// *********************************************************************************************     
-//        K      L     M     N      O      P      Q      R     S     T 
-       0X11D7,0X115D,0X477,0X117,0X4777,0X22DD,0X11D77,0X45D,0X115,0X47,
-//       10     11    12    13     14     15     16     17    18    19
-// *********************************************************************************************     
+    
+// ***********Normal pause between letters *********************************************   
+//                              A      B      C     D    E      F      G     H     I
+    const uint32_t morse[] = {0x11D,0x1157,0x45D7,0x457,0x11,0x1175,0x1177,0x455,0x45,
+//                              0      1      2     3    4      5      6     7     8
+// *************************************************************************************     
+//         J     K      L     M     N      O      P      Q      R     S     T 
+       0x11DDD,0X11D7,0X115D,0X477,0X117,0X4777,0X22DD,0X11D77,0X45D,0X115,0X47,
+//        9     10     11    12    13     14     15     16     17    18    19
+// *************************************************************************************     
 //        U      V      W     X       Y       Z       0       1        2       3  
        0X475,0X11D5,0X11DD,0X4757,0X11DD7,0X4577,0X477777,0x11DDDD,0X47775,0X11DD5,
 //       20     21     22    23      24      25      26      27       28      29  
-// *********************************************************************************************     
+// *************************************************************************************     
 //        4      5      6      7        8       9     SP  SPlg    .        , 
-       0X4755,0X1155,0X4557,0X11577,0X45777,0X117777,0X10,0X80,0X11D75D,0X477577,
+       0X4755,0X1155,0X4557,0X11577,0X45777,0X117777,0X10,0X80,0X101D75D,0X4077577,
 //       30     31     32     33       34      35     36   37     38      39 
-// *********************************************************************************************     
-//        ?       /        '
-       0x45775,0X11757,0X15DDDD};
-//        40      41       42
-// *********************************************************************************************     
-        
+// *************************************************************************************     
+//        ?       /        '        !
+       0x4057751,0X11757,0X15DDDD,0X4775D7};
+//        40      41       42       43
+// *************************************************************************************     
+
+
         this_char = ascii_in;
-       
-        if (this_char == 44) { // look for COMMA char
-            this_char = 39;    // index to Morse char
+        
+        if (this_char == 32) { // look for space char
+            this_char = 36;    // index to Morse char
             }
         else if (this_char == 46) { // look for PERIOD char
-            this_char = 38;    // index to Morse char
+            this_char = 38;         // index to Morse char
+            }
+        else if (this_char == 44) { // look for COMMA char
+            this_char = 39;    // index to Morse char
             }
         else if (this_char == 63) { // look for QUESTION char
-            this_char = 40;    // index to Morse char
+            this_char = 40;         // index to Morse char
             }
         else if (this_char == 47) { // look for FORWARD SLASH char
-            this_char = 41;    // index to Morse char
+            this_char = 41;         // index to Morse char
             }
         else if (this_char == 39) { // look for APOSTROPHY char
-            this_char = 42;    // index to Morse char
+            this_char = 42;         // index to Morse char
+            }
+        else if (this_char == 33) { // look for EXCLAMATION char
+            this_char = 43;    // index to Morse char
             }
         else if (isdigit(this_char)) {    // look for Numbers
             this_char = this_char - 22 ;  // index to Morse char
@@ -198,19 +233,19 @@ void send_CW(char ascii_in) {
             this_char = this_char - 65;   // index to Morse char
             }
         else  {
-            this_char = 36; // SPACE long
+            this_char = 37; // SPACE long
             }      
-                
+
         morse_out = morse[this_char];     // get Morse char from array
         
     while (morse_out != 1) {              // send Morse bits              
         bit_out = (morse_out & masknumber);  // isolate bit to send
         gpio_put(DOTR, !bit_out);  //  Dots need LOW to turn ON  
-        gpio_put(DOTL, !bit_out); // 
+        gpio_put(DOTL, !bit_out);  // 
         
         morse_out /= 2;                   // divide by 2 to shift Right
-        if (cw2_timer != NULL) xTimerStart(cw2_timer, 0);  // define dot length 
-        xQueueReceive(xQtimer2, &t1_info, portMAX_DELAY); // xQueueReceive empties queue
+        if (dot_timer != NULL) xTimerStart(dot_timer, 0);  // define dot length 
+        xQueueReceive(xQdottimer, &t1_info, portMAX_DELAY); // xQueueReceive empties queue
         }
 
 } 
@@ -222,7 +257,7 @@ void send_CW(char ascii_in) {
  *
  * @param timer: The triggering timer.
  */
-void cw1_timer_fired_callback(TimerHandle_t timer) {
+void pause_timer_fired_callback(TimerHandle_t timer) {
     struct op
     {
         uint32_t t_number;
@@ -230,9 +265,9 @@ void cw1_timer_fired_callback(TimerHandle_t timer) {
     }; 
     struct op timer_info = {1,0};
 
-    if (timer == cw1_timer) {
+    if (timer == pause_timer) {
         // The timer fired so trigger cw ID in cw task
-        xQueueOverwrite(xQtimer1, &timer_info);
+        xQueueOverwrite(xQpausetimer, &timer_info);
        }
 }
 
@@ -243,7 +278,7 @@ void cw1_timer_fired_callback(TimerHandle_t timer) {
  *
  * @param timer: The triggering timer.
  */
-void cw2_timer_fired_callback(TimerHandle_t timer) {
+void dot_timer_fired_callback(TimerHandle_t timer) {
     struct op
     {
         uint32_t t_number;
@@ -251,55 +286,51 @@ void cw2_timer_fired_callback(TimerHandle_t timer) {
     }; 
     struct op timer_info = {2,0};
 
-    if (timer == cw2_timer) {
+    if (timer == dot_timer) {
         // The timer fired so trigger cw ID in cw task
-        xQueueOverwrite(xQtimer2, &timer_info);
+        xQueueOverwrite(xQdottimer, &timer_info);
        }
 }
 
-/* 
+/** 
  * @brief Read SW1, SW2 and SW3, calculate binary value, 
  * as a control signal, passed to an action function by a Queue. 
  * ADC reading divided into segments. Value of segments displayed on
  * a Seven Segment LED module
+ * Sw0,Sw1,Sw2 select which phrase is to be output.  Sw5 selects whether
+ * the phrase will be sent full speed, or if it is to be sent with a space
+ * between each character
  */
 
  void select_phrase_task(void* unused_arg) {  // selects which Text phrase to o/p
 
-    const uint8_t  sw_input_mask = 0b00001111;
-    uint32_t select_val;
-    uint32_t temp_sw_input;
     uint8_t  pcfbuffer[2]={0b11111111,0b11111111};// data buffer, must be two bytes
+    const uint8_t  phrase_mask = 0b00000111;
+    const uint8_t  slow_mask = 0b00100000;
+    uint32_t temp_sw_input;
+    uint32_t temp_sw_input2;
+    uint32_t select_phrase;
+    uint32_t select_speed;
    
     while (true) {
         // Read Switches on i2c ports 0, 1, and 2 and add the LED state
         // to the FreeRTOS xQUEUE
       i2c_read_blocking(i2c0, I2C_ADDR, pcfbuffer, 2, false);
       temp_sw_input = pcfbuffer[0]; // protect input values from change
-      select_val = (temp_sw_input &= sw_input_mask);
-      show_seven_seg_i2c(select_val);
+      temp_sw_input2 = pcfbuffer[0]; // protect input values from change
+      select_phrase = (temp_sw_input &= phrase_mask);
+      select_speed = (temp_sw_input2 &= slow_mask)/32;
+
+      show_seven_seg(select_phrase);
+      gpio_put(PICO_LED_PIN, select_speed);   // LED ON for Slow TX   
     
-      xQueueOverwrite(xQphrase5, &select_val);  // ADC output refresh
-      vTaskDelay(ms_delay300);  // check adc value every 300 ms
+      xQueueOverwrite(xQphrase, &select_phrase);  // Phrase select
+      xQueueOverwrite(xQspeed, &select_speed);  // Speed select
+
+      vTaskDelay(ms_delay300);  // 
     }  // End while (true)    
 }
 
-
-/**
- * @brief Generate and print a message from a supplied string.
- * Curser is set before this function call. This function does not 
- * provide CR.
- *
- */
- /*
-void print_msg(const char* msg) {
-    uint msg_length = strlen(msg);
-    char* sprintf_buffer = malloc(msg_length);
-    sprintf(sprintf_buffer, "%s\n", msg);
-    printf("%s", sprintf_buffer);
-    free(sprintf_buffer);
-}
-*/
 
 /**
  * @brief Initialize GPIO Pin for input and output.
@@ -320,12 +351,12 @@ void configure_gpio(void) {
     gpio_disable_pulls(PICO_LED_PIN);  // remove pullup and pulldowns
     gpio_set_dir(PICO_LED_PIN, GPIO_OUT);
 
-    // Configure PICO_LED_PIN for Initialization failure warning
+    // Configure DOTL_PIN for Initialization failure warning
     gpio_init(DOTL);
     gpio_disable_pulls(DOTL);  // remove pullup and pulldowns
     gpio_set_dir(DOTL, GPIO_OUT);
 
-    // Configure PICO_LED_PIN for Initialization failure warning
+    // Configure DOTR_PIN for Initialization failure warning
     gpio_init(DOTR);
     gpio_disable_pulls(DOTR);  // remove pullup and pulldowns
     gpio_set_dir(DOTR, GPIO_OUT);
@@ -335,6 +366,11 @@ void configure_gpio(void) {
     
     // Enable board LED
     gpio_put(PICO_LED_PIN, pico_led_state);  // set initial state to OFF
+
+    // Configure GPIOCLOCK0 to blink LED on GPIO 21 using System PLL clock source
+    clock_gpio_init(D21_P27, 
+                    CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
+                    0X03C000); //   500 Hz
 }
  
 /*
@@ -350,6 +386,7 @@ int main() {
     }; 
     struct op sw_info = {0,0};
 
+    clocks_init();
     pcf8575_init();
     configure_gpio();
     
@@ -362,23 +399,23 @@ int main() {
     printf("\x1B[%i;%ir",6,15);  // set window top and bottom lines
  
 // Timer creates pause between repetition of the CW Text
-    cw1_timer = xTimerCreate("CW1_TIMER", 
+    pause_timer = xTimerCreate("PAUSE_TIMER", 
                             PAUSE_PERIOD,
                             pdFALSE,
-                            (void*)PHRASE_TIMER_ID,
-                            cw1_timer_fired_callback);
-        if (cw1_timer == NULL) {
+                            (void*)PAUSE_TIMER_ID,
+                            pause_timer_fired_callback);
+        if (pause_timer == NULL) {
             error_state  += 1;
             }
             
 
 // Timer creates dot length
-    cw2_timer = xTimerCreate("CW2_TIMER", 
+    dot_timer = xTimerCreate("DOT_TIMER", 
                             DOT_PERIOD,
                             pdFALSE,
-                            (void*)DIT_TIMER_ID,
-                            cw2_timer_fired_callback);
-        if (cw2_timer == NULL) {
+                            (void*)DOT_TIMER_ID,
+                            dot_timer_fired_callback);
+        if (dot_timer == NULL) {
             error_state  += 1;
             }
             
@@ -398,7 +435,6 @@ int main() {
             }
             
     BaseType_t select_phrase_task_status = xTaskCreate(select_phrase_task, 
-             
                                          "SELECT_PHRASE_TASK", 
                                          256, 
                                          NULL, 
@@ -407,22 +443,19 @@ int main() {
         if (select_phrase_task_status != pdPASS) {
             error_state  += 1;
             }
-             
+
    // Set up the event queue
-    xQtimer1 = xQueueCreate(1, sizeof(sw_info)); 
-    if ( xQtimer1 == NULL ) error_state += 1;
+    xQpausetimer = xQueueCreate(1, sizeof(sw_info)); 
+    if ( xQpausetimer == NULL ) error_state += 1;
 
-    xQtimer2 = xQueueCreate(1, sizeof(sw_info)); 
-    if ( xQtimer2 == NULL ) error_state += 1;
+    xQdottimer = xQueueCreate(1, sizeof(sw_info)); 
+    if ( xQdottimer == NULL ) error_state += 1;
 
-    xQueue3 = xQueueCreate(1, sizeof(sw_info)); 
-    if ( xQueue3 == NULL ) error_state += 1; 
+    xQspeed = xQueueCreate(1, sizeof(sw_info)); 
+    if ( xQspeed == NULL ) error_state += 1; 
 
-    xQueue4 = xQueueCreate(1, sizeof(sw_info));
-    if ( xQueue4 == NULL ) error_state += 1;
-     
-    xQphrase5 = xQueueCreate(1, sizeof(uint32_t));
-    if ( xQphrase5 == NULL ) error_state += 1;
+    xQphrase = xQueueCreate(1, sizeof(uint32_t));
+    if ( xQphrase == NULL ) error_state += 1;
     
     // Start the FreeRTOS scheduler 
     // FROM 1.0.1: Only proceed if no tasks signal error in setup
