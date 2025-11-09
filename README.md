@@ -63,7 +63,7 @@ This FreeRTOS C app is a programming exercise to create a Control function respo
 
 ### App-CWKeyer
 
-This FreeRTOS C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows three switches to select up to eight messages. A Seven Segment LED module shows the message number. An LED blinks in response to the morse code being sent. This version of App-Keyer adds PS2 Keyboard input of a Message String in phrase No. 7. Enter the string while strings 0-6 are being output. The PS2 Keyboard is being managed by a PIO input.
+These FreeRTOS C app are a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  A number of versions of the App are included in the folder.  One version uses a Pico only and one switch to select function start and code speed.  Other versions include a GPIO extender, multiple switches. 
 
 ### App-CWTeach
 
