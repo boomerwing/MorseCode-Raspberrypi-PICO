@@ -46,7 +46,7 @@ To use the code in this repo, your system must be set up for RP2040 C/C++ and Fr
 
 ## The Apps
 
-This repo includes a number of deployable apps.
+This repo includes a number of deployable apps.  I have been using these to learn FreeRTOS and its tasks, Queues and timeres while I became familiar with the Raspberry Pi Pico.  PS2 Keyboard input code, switch debounce code, GPIO extender code and Seven Segment LED code is a part of the APP.  The "Smittytone" workspace has been used with his CMAKE organization to manage the code generation.  If you try this code you may have to play with the workspace a little to discover how to use it because it has not been "cleaned up".
 
 ### App-Keyer
 
