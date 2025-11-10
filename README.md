@@ -50,7 +50,7 @@ This repo includes a number of deployable apps.  I have been using these to lear
 
 ### App-Keyer
 
-This C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows three switches to select up to eight messages. A Seven Segment LED module shows the message number and two LED dots blink in response to the morse code being sent.
+This C app is a Morse Code CW Keyer used by Radio Amateurs to automatically transmit a repeated message in Morse Code. A number of messages can be stored and selected by switches.  The code shows three switches to select up to eight messages. A Seven Segment LED module shows the message number and two LED dots blink in response to the morse code being sent.  Three different versions are provided. There are two versions which create Ring buffers which are filled with PS2 Keyboard text.  One Ring Buffer is created in Global Variable space.  The second version uses a Queue to implement the Ring Buffer.
 
 ### App-Shuffle
 
