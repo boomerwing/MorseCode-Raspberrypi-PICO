@@ -20,10 +20,7 @@
 #include "../Common/Seven_Seg_i2c/seven_seg.h"
 #include "../Common/ps2/ps2.h"
 
-// #define PAUSE_PERIOD 2800
 #define DOT_PERIOD 60
-#define INTERVALS 7
-#define SENTENCE 1
 #define I2C_ADDR 0x20
 #define RING_SIZE 32 
 #define CW_GPIO  17     // pin 22 for CW Tone output
@@ -212,11 +209,12 @@ void send_CW(char ascii_in) {
 
 
 /**
- * @brief Repeat check of txtctl, stop and start blinking
- * Waits for text input (YES/NO). If "YES" blink. IF "NO" stop blinking.
- * Sends command string to on_off_task with qbuffer mailbox
- * as a control signal.
- * BACKSPACE deletes characters entered to correct entry mistakes
+ * @brief ringbuffer_in task
+ * waits for a character from the PS2 Keyboard.  When a character is offered
+ * it puts the character in the next slot in the ring, increments the count
+ * and points to the next available position in the ring.  Once the ring is full
+ * it does not look for new characters till there is space in the ring.
+ * The ring is created in Global space to make it available to other tasks.
  */
 void ringbuffer_in_task(void* unused_arg) {
     uint32_t i = 0; //  counter
@@ -247,11 +245,9 @@ void ringbuffer_in_task(void* unused_arg) {
 } 
 
 /**
- * @brief Repeat check of txtctl, stop and start blinking
- * Waits for text input (YES/NO). If "YES" blink. IF "NO" stop blinking.
- * Sends command string to on_off_task with qbuffer mailbox
- * as a control signal.
- * BACKSPACE deletes characters entered to correct entry mistakes
+ * @brief ringbuffer_out
+ * Takes the last character entered into the buffer and sends to to the 
+ * xQring queue to be collected by the CW task
  */
 void ringbuffer_out_task(void* unused_arg) {
 	next = ring;

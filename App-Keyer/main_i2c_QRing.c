@@ -2,7 +2,7 @@
  * RP2040 FreeRTOS Template: Send CW with Timer trigger
  * Timer is monostable, creating DOT duration.
  * Text is entered through the PS2 Keyboard
- * Queue is used for the Ring buffer holding up
+ * Queue is used for a Ring buffer holding up
  * to 64 Characters.
  * A Real time task scans the keyboard and a task sends the Morse Code
  * A terminal printout of sent characters is provided.
@@ -190,7 +190,7 @@ void send_CW(char ascii_in) {
     while (morse_out != 1) {              // send Morse bits              
         bit_out = (morse_out & masknumber);  // isolate bit to send
         gpio_put(DOTL, !bit_out);         //  Dots need LOW to turn ON   D11_P15
-//        gpio_put(CW_GPIO, !bit_out);       //  To audio gate, needs LOW to gate tone through.
+//        gpio_put(CW_GPIO, !bit_out);       //  To discrete Transistor gate, needs LOW
         gpio_put(CW_GPIO, bit_out);       //  To CD4010 gate, needs HIGH to gate tone through.
         
         morse_out /= 2;                   // divide by 2 to shift Right
@@ -204,9 +204,13 @@ void send_CW(char ascii_in) {
 
 
 /**
- * @brief Repeat check of Queue Space available.
+ * @brief ringbuffer_in task
+ * Repeatedly check for Queue Space available.
  * If space available, look for new character from keyboard.
  * If character is available, put in the BACK of the Queue.
+ * If Queue is full don't look for a new character. The character at
+ * the front of the queue will be removed by the CW task to be send
+ * as a CW Morse coded character and also printed on STDOUT
  */
 void ringbuffer_in_task(void* unused_arg) {
     uint32_t i = 0; //  counter
