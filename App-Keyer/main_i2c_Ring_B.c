@@ -22,7 +22,7 @@
 
 #define DOT_PERIOD 60
 #define I2C_ADDR 0x20
-#define RING_SIZE 32 
+#define RING_SIZE 64 
 #define CW_GPIO  17     // pin 22 for CW Tone output
 #define LINE_LENGTH 70
 
@@ -42,7 +42,7 @@ volatile TimerHandle_t cwd_timer;
 volatile QueueHandle_t xQtimerd = NULL;
 volatile QueueHandle_t xQring = NULL;
 
-// **** Ring Buffer ********************
+// **** Ring Buffer - Global ***********
     char ring[RING_SIZE];
     char *ring_end = ring + (RING_SIZE -1) ;
     char *next;
@@ -73,7 +73,7 @@ void cw_task(void* unused_arg) {
          if(uxQueueMessagesWaiting(xQring)){
             xQueueReceive(xQring,&this_char, portMAX_DELAY);
             send_CW(this_char);
-// *****  Print out characters being sent   ***************           
+ // *****  Print out characters being sent   ***************           
  // *****  Provde for minimal break of words ***************           
 			if((this_char == 0x0D) || (this_char == 0x0A)){
 				printf("%c %c", 0X0A, 0X0D);  // Print CR LF
@@ -214,13 +214,12 @@ void send_CW(char ascii_in) {
  * it puts the character in the next slot in the ring, increments the count
  * and points to the next available position in the ring.  Once the ring is full
  * it does not look for new characters till there is space in the ring.
- * The ring is created in Global space to make it available to other tasks.
+ * The ring is created in Global space to make it available to 
+ * ringbuffer_out task.
  */
 void ringbuffer_in_task(void* unused_arg) {
     uint32_t i = 0; //  counter
-    char out_char;
     char new_char;
-//    char_count = 0;
 	next = ring;
 	
     ring_end = ring + RING_SIZE -1;
@@ -230,46 +229,45 @@ void ringbuffer_in_task(void* unused_arg) {
         }
     
     while(true){
-		while(char_count<RING_SIZE){
+		if(char_count<RING_SIZE-1){
 
 			new_char = get_iso8859_code();  // from ps2.c 
 			if(new_char){
-					*next++ = new_char;   // put new_char in ring
-					char_count++;
-					if(next>ring_end){
-						next = ring;
-					}
+				*next++ = new_char;   // put new_char in ring
+				if(next>ring_end){
+					next = ring;
+				}
+			char_count++;
 			}
+		vTaskDelay(ms_delay50);
 		}
+	vTaskDelay(ms_delay50); 
     }  // End while (true)    
 } 
 
 /**
  * @brief ringbuffer_out
- * Takes the last character entered into the buffer and sends to to the 
+ * Takes the earliest character entered into the buffer and sends it to the 
  * xQring queue to be collected by the CW task
  */
 void ringbuffer_out_task(void* unused_arg) {
 	next = ring;
     take = ring;
-    ring_end = ring + RING_SIZE -1 ;
 	
-
     while(true){
 
         while(take != next) {
 			if(uxQueueSpacesAvailable(xQring)){
-				xQueueSendToFront(xQring,take,0);  // ring output refresh
+				xQueueSendToFront(xQring,take,0);  // remove char from ring
                 char_count--;
                 take++;
 				if(take > ring_end){
-                    take = ring;  // take to the beginning of the ring
+                    take = ring;  // return take to the beginning of the ring
 					} 
 			}            // end if
-
-        vTaskDelay(ms_delay200);  
-       }  // end while(char_count)
-        vTaskDelay(ms_delay100);
+        vTaskDelay(ms_delay50);
+       }  // end while(take != next)
+    vTaskDelay(ms_delay200);
    
     }  // End while (true)    
 } 
@@ -317,16 +315,19 @@ void configure_gpio(void) {
     gpio_init(PICO_LED_PIN);
     gpio_disable_pulls(PICO_LED_PIN);  // remove pullup and pulldowns
     gpio_set_dir(PICO_LED_PIN, GPIO_OUT);
+    gpio_put(PICO_LED_PIN, pico_led_state);  // set initial state to OFF
 
-    // Configure DOTR LED_PIN 
+    // Configure DOTL LED_PIN 
     gpio_init(DOTL);
     gpio_disable_pulls(DOTL);  // remove pullup and pulldowns
     gpio_set_dir(DOTL, GPIO_OUT);
+    gpio_put(DOTL, 1); 		   // Set initial state to OFF
 
     // Configure GPIO 17 PIN 22
     gpio_init(CW_GPIO);
     gpio_disable_pulls(CW_GPIO);  // remove pullup and pulldowns
     gpio_set_dir(CW_GPIO, GPIO_OUT);
+    gpio_put(CW_GPIO, 0); 	//  Tone off to begin with, to Satisfy CD4010
 
     // Configure GPIOCLOCK0 to blink LED on GPIO 21 using System PLL clock source
     clock_gpio_init(D21_P27, 
@@ -334,7 +335,6 @@ void configure_gpio(void) {
                     0X03C000); //   500 Hz
 
     // Enable board LED
-    gpio_put(PICO_LED_PIN, pico_led_state);  // set initial state to OFF
 
 
 }
@@ -355,9 +355,6 @@ int main() {
 
     configure_gpio();
     
-        gpio_put(DOTR, 1);  	//  Turns DOTs off to begin with  
-        gpio_put(DOTL, 1); 		// 
-        gpio_put(CW_GPIO, 0); 	//  Tone off to begin with, to Satisfy CD4010
         
     // label Program Screen
     printf("\x1B[2J");  // Clear Screen
@@ -397,7 +394,7 @@ int main() {
                                          "RINGBUFFER_IN_TASK", 
                                          256, 
                                          NULL, 
-                                         6,     // Task priority
+                                         7,     // Task priority
                                          &ringbuffer_in_task_handle);
         if (ringbuffer_in_status != pdPASS) {
             error_state += 1;
@@ -407,7 +404,7 @@ int main() {
                                          "RINGBUFFER_OUT_TASK", 
                                          256, 
                                          NULL, 
-                                         7,     // Task priority
+                                         6,     // Task priority
                                          &ringbuffer_out_task_handle);
         if (ringbuffer_out_status != pdPASS) {
             error_state += 1;
