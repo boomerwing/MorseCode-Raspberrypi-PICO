@@ -145,10 +145,11 @@ const TickType_t ms_delay349 = 349 / portTICK_PERIOD_MS;
 //void print_msg(const char* msg);
 //void log_device_info(void);
 void configure_gpio(void);
-//char *get_string(const char *prompt);
 void send_CW(const char);
 void cw_timer_fired_callback(TimerHandle_t);
 void pause_timer_fired_callback(TimerHandle_t);
+void showRing(void);
+void vApplicationIdleHook( void );
 
 #ifdef __cplusplus
 }           // extern "C"
